@@ -1,0 +1,46 @@
+
+asap_test_lab_x_twitter_bearer_token.txt
+x_last_seen_id.txt
+x_last_seen_id.txt.tmp
+
+
+# ==================================================
+# Secrets / API credentials
+# ==================================================
+
+*_token.txt
+*token*.txt
+.env
+.env.*
+secrets/
+credentials/
+
+
+# ==================================================
+# Python
+# ==================================================
+
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+
+# ==================================================
+# IDE / OS
+# ==================================================
+
+.vscode/
+.DS_Store
+Thumbs.db
+
+
+# ==================================================
+# Temporary files
+# ==================================================
+
+*.tmp
+*.log
+
+# Local repository setup script
+setup_repo.py
