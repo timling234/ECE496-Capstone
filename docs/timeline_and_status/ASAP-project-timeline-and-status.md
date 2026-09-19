@@ -5,79 +5,213 @@
 **Supervisor:** Prof. Hans-Arno Jacobsen  
 **Team:** Tianyu Ling, Shengya Huang, Molin Zhang, Zhengfei Yu
 
+---
+
 ## Project Objective
 
-Develop an open-source, maintainable, and extensible social-media feed aggregator for MSRG. The system will initially integrate LinkedIn, X, and Bluesky, curate and normalize provider content, and expose the resulting feed for website integration.
+Develop an open-source, maintainable, and extensible social-media feed aggregator for MSRG.
 
-## Timeline
+ASAP will initially integrate **LinkedIn, X, and Bluesky**, retrieve posts from selected organization-owned accounts, normalize and curate provider content, and expose a unified feed for website integration.
 
-### Initial Project Discussion / Snapshot Preparation
+The initial deployment target is the **MSRG website**, while the architecture should remain extensible to additional providers and websites.
 
-The team established its initial interpretation of ASAP, prepared the Project Snapshot, and documented questions about project motivation, technical depth, APIs, content handling, hosting, and scope.
+---
 
-**Outcome:** Project Snapshot submitted and initial questions subsequently clarified.
+# Current Phase
 
-### September 11, 2026 - Project Kickoff
+## Phase 1 - Project Proposal & Preliminary Research
 
-The team received the detailed project requirements and clarified the motivation for replacing the existing Elfsight-based MSRG feed.
+**Status:** In Progress  
+**Period:** September - October 2026
 
-Two central needs were identified:
+The project is currently focused on validating the proposed direction before full implementation begins.
 
-1. Greater control over ingestion, curation, filtering, display, and deployment.
-2. A maintainable and extensible open-source system rather than dependence on a third-party widget.
+Current work includes:
 
-The project requirements include preliminary competitor/open-source analysis, modular provider architecture, content curation, multi-site support, responsive iframe rendering, Docker deployment, testing, and documentation.
+- Project requirements clarification
+- Initial API feasibility testing
+- Existing-solution and open-source research
+- Initial system architecture
+- Proposal Meeting preparation
+- Formal Project Proposal
+- LinkedIn access investigation
 
-**Immediate next step:** establish API feasibility for LinkedIn, X, and Bluesky.
+### Work Completed So Far
 
-### September 16, 2026 - Feasibility Review with Michalis
+**Project Snapshot**
+- Initial project interpretation established
+- Project questions documented
+- Snapshot submitted
 
-The team presented its initial API feasibility study.
+**September 11 - Project Kickoff**
+- Detailed project requirements received
+- Existing Elfsight-based workflow discussed
+- Project motivation and expected technical scope clarified
 
-- **X:** Official API POC passed for text, links, images, and incremental polling.
-- **Bluesky:** Public-read POC passed; simplest tested integration.
-- **LinkedIn:** Technically feasible, but further testing requires institutional/organization authorization.
+**Initial API Feasibility**
+- X official API POC passed
+- Bluesky public-read POC passed
+- LinkedIn API path investigated
+- LinkedIn testing currently requires Business Account Authentication
 
-Michalis indicated that this initial feasibility phase was essentially complete.
+**September 16 - Feasibility Review**
+- Initial API feasibility presented to Michalis
+- Feasibility investigation considered sufficient for the current stage
+- Proposal preparation and existing-solution research identified as the next priorities
 
-**New priorities for the following two weeks:**
+**Existing-Solution Research**
+- Elfsight reviewed as the current MSRG solution
+- Walls.io reviewed as a commercial alternative
+- Harken reviewed as an open-source architectural reference
 
-1. Complete the ECE496 Proposal and Proposal Meeting preparation.
-2. Conduct preliminary market/open-source analysis of existing feed aggregators and compare them against ASAP requirements.
+---
 
-## Current Technical Direction
+# Project Roadmap
 
-LinkedIn / X / Bluesky  
--> Provider Adapters  
--> Unified Post Model  
--> ASAP API  
--> MSRG Website
+```text
+PAST                              NOW                              FUTURE
 
-## Current Project Status
+───────────────────────────────────────────────────────────────────────────────>
 
-- Project Snapshot: **Completed / submitted**
-- Detailed requirements: **Received**
-- Initial API feasibility: **Substantially completed**
-- X POC: **Passed**
-- Bluesky public-read POC: **Passed**
-- LinkedIn POC: **Pending institutional authorization**
-- Proposal preparation: **Current priority**
-- Existing-solution / open-source analysis: **Current priority**
-- Full implementation: **Next phase**
+Snapshot        API           Proposal &        Core           Website       Final
+& Kickoff    Feasibility       Research      Development     Integration    Delivery
 
-## Documentation
+    ✓             ✓               ●               ○               ○            ○
 
-Shared Google Drive: https://drive.google.com/drive/folders/18Og0OanPjyRoiOnd3dT5Sb8wzWtRQ5Kw?usp=sharing
+ Sep 2026      Sep 2026        Sep / Oct        Fall           Winter        Winter
+```
 
-GitHub repository structure is intended to maintain formal project documents, meeting minutes, tests/POCs, prototypes, source code, and supporting engineering documentation.
+**Legend:**  
+`✓` Completed &nbsp;&nbsp; `●` Current &nbsp;&nbsp; `○` Planned
 
-## Immediate Action Items
+---
 
-- Prepare Proposal Meeting material.
-- Complete formal Project Proposal.
-- Review proposal with the supervisor/team.
-- Analyze Elfsight and at least three other leading commercial feed aggregators.
-- Identify and evaluate open-source alternatives.
-- Create a comparison matrix against ASAP requirements.
-- Continue LinkedIn access/authorization follow-up.
-- Begin unified provider architecture after proposal/preliminary-analysis priorities are addressed.
+# Current Technical Direction
+
+```text
+ LinkedIn ──┐
+ X ─────────┼──> Provider Adapters
+ Bluesky ───┘
+                    │
+                    ▼
+             Unified Post Model
+                    │
+                    ▼
+           Filtering / Curation
+                    │
+                    ▼
+                  Cache
+                    │
+                    ▼
+                ASAP API
+                    │
+                    ▼
+            Website / iframe
+                    │
+                    ▼
+              MSRG Website
+```
+
+The architecture separates provider-specific retrieval from the common ASAP processing pipeline, allowing providers to be added or modified without redesigning the entire system.
+
+---
+
+# Current Status
+
+| Area | Status |
+|---|---|
+| Project Snapshot | ✓ Completed |
+| Detailed Requirements | ✓ Received |
+| X API POC | ✓ Passed |
+| Bluesky Public-read POC | ✓ Passed |
+| LinkedIn API Investigation | ⚠ Business Account Authentication Needed |
+| Existing-Solution Research | ● In Progress |
+| Proposal Meeting Preparation | ● In Progress |
+| Formal Project Proposal | ● In Progress |
+| Initial Architecture | ● In Progress |
+| Core Implementation | ○ Planned |
+| Website Integration | ○ Planned |
+| Testing & Deployment | ○ Planned |
+
+---
+
+# ECE496 Timeline
+
+```text
+2026
+
+SEP                    OCT                    NOV                    DEC
+│                      │                      │                      │
+├─ Sep 18              ├─ Oct 10             ├─ Nov 7              ├─ Interim Demo
+│  Project Snapshot    │  Project Proposal   │  Implementation     │  Nov 30-Dec 4
+│  ✓                   │                     │  Plan               │
+│                      │                     │                      │
+└─ Sep 21-25           │                     │                      │
+   Proposal Meeting    │                     │                      │
+   ●                   │                     │                      │
+
+
+2027
+
+JAN                    FEB                    MAR
+│                      │                      │
+├─ Jan 10-16           ├─ Feb 2 / 4 / 9      ├─ Mar 20
+│  Admin Design        │  Oral Presentation  │  Final Report
+│  Review              │  Final Evaluation   │
+│                      │                      │
+├─ Jan 19 / 21 / 26    │                      ├─ Mar 23-25
+│  Presentation        │                      │  Design Fair &
+│  Feedback            │                      │  Poster Presentation
+│                      │                      │
+└─ Jan 24-30           │                      └─ Mar 27
+   Technical Design    │                         Best-Team Showcase
+   Review              │                         (if selected)
+```
+
+---
+
+# Key Upcoming Milestones
+
+| Date | Milestone | Project Focus |
+|---|---|---|
+| **Sep 21-25, 2026** | Proposal Meeting | Present project direction, feasibility, architecture, and plan |
+| **Oct 10, 2026** | Project Proposal | Formalize requirements, design, and implementation approach |
+| **Nov 7, 2026** | Implementation Plan | Define implementation and testing strategy |
+| **Nov 30-Dec 4, 2026** | Interim Demo | Demonstrate interim technical progress |
+| **Jan 24-30, 2027** | Technical Design Review | Review technical implementation with supervisor |
+| **Feb 2 / 4 / 9, 2027** | Oral Presentation Final Evaluation | Present project progress and design |
+| **Mar 20, 2027** | Final Report | Submit complete engineering report |
+| **Mar 23-25, 2027** | Design Fair | Demonstrate final ASAP system |
+
+---
+
+# Immediate Action Items
+
+- Complete Proposal Meeting presentation
+- Complete formal Project Proposal
+- Complete existing-solution comparison
+- Continue LinkedIn Business Account Authentication investigation
+- Refine initial ASAP architecture
+- Prepare for implementation following proposal feedback
+
+---
+
+# Documentation
+
+Project documentation is maintained through the team's shared Google Drive and GitHub repository.
+
+The repository is intended to contain:
+
+- Requirements
+- Meeting minutes
+- Existing-solution research
+- API feasibility investigations
+- Provider POCs
+- Architecture documentation
+- Source code
+- Tests
+- Deployment configuration
+- Engineering documentation
+
+**Shared Google Drive:**  
+https://drive.google.com/drive/folders/18Og0OanPjyRoiOnd3dT5Sb8wzWtRQ5Kw?usp=sharing
