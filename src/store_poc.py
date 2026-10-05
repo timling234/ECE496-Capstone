@@ -11,8 +11,10 @@ from urllib.request import Request, urlopen
 
 if __package__:
     from .relevance import mark_candidates
+    from .duplicates import mark_duplicate_candidates
 else:
     from relevance import mark_candidates
+    from duplicates import mark_duplicate_candidates
 
 ROOT = Path(__file__).resolve().parents[1]
 X_TOKEN = ROOT / "asap_test_lab_x_twitter_bearer_token.txt"
@@ -136,15 +138,36 @@ def load_posts(conn):
     return posts
 
 
-def main():
+# FR-3/FR-4/FR-5: Re-evaluate derived stages from saved common records
+def process_stored(conn):
+    candidates = mark_candidates(conn, load_posts(conn), rules=())
+    groups = mark_duplicate_candidates(conn, candidates)
+    return candidates, groups
+
+
+def main(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("--db", type=Path, default=ROOT / ".tmp" / "store_poc.sqlite3")
     parser.add_argument("--limit", type=int, default=5)
     parser.add_argument("--provider", choices=["x", "bluesky", "both"], default="both")
-    parser.add_argument("--inspect", action="store_true", help="Read existing database counts without API calls or writes.")
-    args = parser.parse_args()
+    modes = parser.add_mutually_exclusive_group()
+    modes.add_argument("--inspect", action="store_true", help="Read existing database counts without API calls or writes.")
+    modes.add_argument("--reprocess", action="store_true", help="Re-evaluate stored posts with MVP defaults, without fetching providers.")
+    args = parser.parse_args(argv)
     if not 1 <= args.limit <= 100:
         parser.error("--limit must be between 1 and 100")
+    if args.reprocess:
+        try:
+            # rw requires an existing database; never creates a missing Store.
+            with closing(sqlite3.connect(args.db.resolve().as_uri() + "?mode=rw", uri=True)) as conn:
+                with conn:
+                    candidates, groups = process_stored(conn)
+            print(f"review candidates: {len(candidates)}; duplicate candidate groups: {len(groups)}")
+            print("Source rows and publication decisions unchanged; no API calls.")
+            return 0
+        except (OSError, sqlite3.Error, ValueError, TypeError):
+            print("Unable to reprocess existing Store database.")
+            return 1
     if args.inspect:
         try:
             # mode=ro prevents accidentally creating or modifying the database.
@@ -174,10 +197,11 @@ def main():
         with conn:
             store(conn, posts)
             # FR-4: Empty MVP rule configuration admits candidates, never approves.
-            candidates = mark_candidates(conn, load_posts(conn), rules=())
+            candidates, groups = process_stored(conn)
             counts = conn.execute("SELECT platform, COUNT(*) FROM posts GROUP BY platform").fetchall()
     print(f"stored {len(posts)} fetched posts; database counts: {dict(counts)}")
     print(f"review candidates: {len(candidates)}; publication decisions unchanged")
+    print(f"duplicate candidate groups: {len(groups)}; no representative selected")
     return 0
 
 

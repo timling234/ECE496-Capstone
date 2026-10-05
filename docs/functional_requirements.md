@@ -8,9 +8,9 @@ This table tracks progress. The detailed requirements and traceability below rem
 | --- | --- | --- | --- |
 | FR-1 | Source ingestion | 🟡 In Progress | X/Bluesky POC works; LinkedIn, scheduling and full verification remain. |
 | FR-2 | Common post representation | 🟡 In Progress | X/Bluesky mapping fixtures pass; final model and all-provider coverage remain. |
-| FR-3 | Persistent provenance and state | 🟡 In Progress | Persistence/upsert/readback tests pass; replay and source/decision history remain. |
+| FR-3 | Persistent provenance and state | 🟡 In Progress | Persistence and offline default-stage replay verified; source/decision history remains. |
 | FR-4 | Relevance curation | 🟡 In Progress | Empty rules allow all; candidate state tested separately from approval. Admin controls remain. |
-| FR-5 | Duplicate control | ❓ Decision Needed | Core scope accepted; similarity/grouping policy is unresolved. |
+| FR-5 | Duplicate control | 🟡 In Progress | Exact-text candidate groups verified; fuzzy policy and representative selection unresolved. |
 | FR-6 | Selection and ordering | ❓ Decision Needed | Representative selection and order policy need confirmation. |
 | FR-7 | Management and approval | ❓ Decision Needed | Core scope accepted; administrator workflow/authentication unresolved. |
 | FR-8 | Administrator notification | ❓ Decision Needed | Core scope accepted; channel and recipients unresolved. |
@@ -59,7 +59,7 @@ Status: proposed, 2026-10-05. These are design targets, not claims of completed 
 | Shared fields (S2, S3) | FR-2 | Normalizer/model | `src/store_poc.py:normalize_x/normalize_bluesky` proof of concept | `tests/test_store_poc.py:NormalizationTests`: X/Bluesky synthetic mappings and missing optional fields verified; LinkedIn TBD |
 | Original/normalized/state storage (S2) | FR-3 | SQLite repository | `src/store_poc.py:store/load_posts`, read-only `--inspect` | `tests/test_store_poc.py:StoreTests`: restart persistence, JSON roundtrip, idempotency, provider identity, editorial-field preservation, rollback, offline readback, read-only inspection verified; replay/history TBD |
 | Relevance and removal (S1, S3) | FR-4 | Rules, review state | `src/relevance.py:mark_candidates`; default stage in `store_poc.py` | `tests/test_relevance.py` and mocked ingestion: pass-through, source preservation, candidate/approval separation verified; admin removal TBD |
-| One visible copy (S1–S3) | FR-5 | Duplicate candidates, review | TBD; current unique key handles only the same platform/native ID | TBD |
+| One visible copy (S1–S3) | FR-5 | Duplicate candidates, review | `src/duplicates.py`: independent exact-match grouping after relevance | `tests/test_duplicates.py`: cross-platform groups, conservative normalization, original preservation, reversible state and strategy boundary verified; representative/output TBD |
 | Representative choice/order (S2, S4) | FR-6 | Review controls, feed query | Priority field placeholder only | TBD |
 | Administrator control (S1–S3) | FR-7 | Admin backend/config | TBD | TBD |
 | New-content alert (S3) | FR-8 | Notification/outbox | TBD | TBD |
@@ -84,3 +84,11 @@ Tim approved an always-present relevance stage with an empty default rule config
 `src/relevance.py` stores derived `candidate`/`filtered` state separately, leaving source rows and publication state untouched. The extension interface accepts boolean predicates and requires all supplied predicates to pass. User-facing rule configuration and combination semantics remain to be confirmed when actual rules are introduced. No Horizon code or filtering policy was copied.
 
 FR-4 milestone verification: 16 offline tests pass, including five relevance tests and a mocked fetch → store → candidate integration test. Full FR-4 remains In Progress because administrator inclusion/exclusion/withdrawal is not implemented.
+
+## FR-5 initial engineering default and offline replay
+
+Exact matching trims and collapses whitespace while preserving case, punctuation and Unicode spelling. Empty text never creates a group. This reversible first strategy is not permanent product policy. Cross-platform matches are stored in `duplicate_candidates` with stable `exact-v1` text-hash IDs; no raw/source rows are merged or deleted, no representative is chosen, and approval state is untouched. The legacy `posts.duplicate_group` column is not used by detection. All current relevance candidates form the stage input; re-evaluation replaces only derived candidate memberships. Fuzzy thresholds and representative/publication behavior remain Decision Needed.
+
+FR-5 verification: 22 tests passed after detection. The subsequent offline replay increment brought the suite to 24 passing tests. `store_poc.py --reprocess` reruns default pass-through and exact grouping from an existing Store without APIs, preserving source rows and editorial fields. Missing databases fail without being created. Source-version/decision history remains unimplemented. FR-3/4/5 stay In Progress.
+
+Manual sanity guide: [manual_sanity.md](manual_sanity.md). The deterministic demo uses a temporary database and never touches `.tmp/store_poc.sqlite3`.

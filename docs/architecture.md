@@ -8,11 +8,11 @@ This is a living design, revised as implementation and stakeholder feedback prov
 | --- | --- | --- |
 | X / Bluesky fetch functions | 🟡 In Progress | Working POCs; final adapter contract and scheduler remain. |
 | Common normalization | 🟡 In Progress | X/Bluesky synthetic fixture tests pass; final validation/model remains. |
-| SQLite ingest store | 🟡 In Progress | Upsert, reopen, rollback, state preservation and offline readback verified; replay/versioning/history remain. |
+| SQLite ingest store | 🟡 In Progress | Upsert, readback and offline derived-stage replay verified; source-version and decision history remain. |
 | Scheduler / provider contract / Docker | ⚪ Planned | No implementation yet. |
 | LinkedIn adapter | ❓ Decision Needed | API access pending; fallback behavior requires confirmation. |
 | Relevance stage | 🟡 In Progress | Default pass-through and separate candidate state verified; real rules/admin controls remain. |
-| Duplicate candidates | ❓ Decision Needed | Similarity/grouping policy requires confirmation. |
+| Duplicate candidates | 🟡 In Progress | Separate exact-text strategy and persisted groups verified; fuzzy policy/representative workflow unresolved. |
 | Admin review / selection / order | ❓ Decision Needed | Workflow and identity require confirmation. |
 | Notifications / public feed integration | ❓ Decision Needed | Channel and website interface require confirmation. |
 | Manual items / site separation | ❓ Decision Needed | Scope requires confirmation. |
@@ -52,6 +52,8 @@ Configured accounts + refresh schedule
 The store also holds configuration, source/fetch state, decision history, and publication state, though these need not be in one table. Manual announcements (if retained) enter after provider ingestion, through validation and review. A later provider can be added behind the same raw-to-common contract. The management backend is a control plane for configuration and decisions, not a one-time stage in a linear pipeline.
 
 ## Ordering decision
+
+Implemented path: ingest → normalize → store → default relevance → exact-text duplicate candidates. `process_stored` also supports offline replay via `--reprocess`, opening an existing database only and rerunning derived stages. Detection consumes the complete current candidate set and replaces only `duplicate_candidates` memberships. `exact_text_groups` is a separate replaceable strategy; whitespace-only normalization is case/punctuation sensitive and excludes empty text. Source records and publication state are unchanged by processing. Stable group IDs identify candidate groups, not publication representatives. These increments are verified by 24 offline tests and an isolated SQLite demo; administrator workflow and public output remain unimplemented.
 
 Current FR-4 MVP decision (architecture B): the relevance stage always runs after storage. Empty rules allow every ingested post to become a candidate. `src/relevance.py:mark_candidates` persists derived candidate/filtered status independently of `posts.publication_status`; no approval occurs here. Configured predicate extensions can evaluate posts, but no keyword/tag/provider rule is implemented. Source payloads are preserved. Sixteen offline tests verify the current pipeline and state separation. Administrator transitions and actual rule configuration remain future decisions.
 

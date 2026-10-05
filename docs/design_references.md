@@ -9,7 +9,7 @@ These states describe design influence, independently of FR implementation progr
 | REF-HORIZON-01 | Under evaluation | Provider contract proposed; no contract implemented yet. |
 | REF-HORIZON-02 | Partially adopted/adapted | Shared provider-independent POC representation; independent code, no Horizon fields/classes copied. |
 | REF-HORIZON-03 | Partially adopted/adapted | Replaceable processing stage aligns with design; pass-through is Tim's decision, independently implemented. |
-| REF-HORIZON-04 | Under evaluation | Testable stages may help; duplicate policy pending. |
+| REF-HORIZON-04 | Partially adopted/adapted | Separate duplicate stage implemented independently; no digest merge/scoring copied. |
 | REF-HORIZON-05 | Partially adopted/adapted | Data/output boundary informs design; SQLite itself is stakeholder-grounded and independent. |
 | REF-HORIZON-06 | Under evaluation | Replaceable configuration/delivery idea; channels unresolved. |
 
@@ -31,3 +31,5 @@ This file records external inspiration separately from ASAP requirements. ASAP r
 Horizon has no evident Bluesky or LinkedIn scraper in the inspected source list. Its documented Twitter/X source uses Apify and optional browser tooling; this is materially different from ASAP's current API proof of concept. Its public README and inspected modules show automated briefing generation, rather than a demonstrated administrator approve/reject/withdraw workflow. Absence here means **not found in the inspected files**, not a claim about every historical branch or feature.
 
 If code is ever copied later, record the exact Horizon commit/path, copy extent, MIT attribution, and license compatibility in the change. A conceptual `REF-HORIZON-n` tag alone does not mean code was copied.
+
+FR-5 implementation trace: `src/duplicates.py` uses REF-HORIZON-04 solely for stage separation. Conservative exact-text matching was authorized by Tim as a reversible engineering default; stable hashing, separate SQLite memberships and offline replay are independent implementation details. No Horizon code or digest behavior was copied. Similarity thresholds, automatic representative selection and source priority remain unresolved.

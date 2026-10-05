@@ -209,8 +209,11 @@ choose another database path. It does not change the X polling cursor.
 
 Inspect stored counts without calling APIs or writing the database:
 `python src/store_poc.py --inspect`. `load_posts(conn)` restores saved common
-fields, raw objects, metadata and state for future processing; rule replay is
-not implemented yet.
+fields, raw objects, metadata and state for processing. Replay currently uses
+MVP defaults; user-defined rule configuration is not implemented yet.
+Default relevance and exact-match duplicate stages can now be replayed offline
+using `python src/store_poc.py --reprocess`; source and editorial fields remain unchanged.
+See [manual sanity commands](docs/manual_sanity.md) for an isolated duplicate demo.
 
 Run offline FR-2/FR-3 regression tests with
 `python -m unittest discover -s tests -p "test_*.py" -v`.

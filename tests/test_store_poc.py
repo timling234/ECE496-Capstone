@@ -183,5 +183,29 @@ class StoreTests(unittest.TestCase):
             self.assertEqual(conn.execute("SELECT publication_status FROM posts").fetchall(), [("pending",), ("pending",)])
 
 
+    def test_reprocess_is_offline_and_preserves_sources_and_decisions(self):
+        """Verifies FR-3/FR-4/FR-5: saved source records can be processed offline."""
+        self.posts[1]["text"] = self.posts[0]["text"]
+        with self.connect() as conn:
+            store(conn, self.posts)
+            conn.execute("UPDATE posts SET publication_status='approved' WHERE platform='x'")
+            before = conn.execute("SELECT * FROM posts ORDER BY platform").fetchall()
+        with patch("sys.argv", ["store_poc.py", "--reprocess", "--db", str(self.path)]), patch("src.store_poc.fetch_x") as x, patch("src.store_poc.fetch_bluesky") as bsky, redirect_stdout(io.StringIO()):
+            self.assertEqual(main(), 0)
+            self.assertEqual(main(), 0)
+        x.assert_not_called()
+        bsky.assert_not_called()
+        with self.connect() as conn:
+            self.assertEqual(conn.execute("SELECT * FROM posts ORDER BY platform").fetchall(), before)
+            self.assertEqual(conn.execute("SELECT COUNT(DISTINCT group_id) FROM duplicate_candidates").fetchone()[0], 1)
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM relevance WHERE status='candidate'").fetchone()[0], 2)
+
+    def test_reprocess_does_not_create_missing_database(self):
+        """Verifies FR-3: offline reprocessing cannot create missing source state."""
+        with patch("sys.argv", ["store_poc.py", "--reprocess", "--db", str(self.path)]), redirect_stdout(io.StringIO()):
+            self.assertEqual(main(), 1)
+        self.assertFalse(self.path.exists())
+
+
 if __name__ == "__main__":
     unittest.main()
