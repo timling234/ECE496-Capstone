@@ -198,6 +198,37 @@ JAN                    FEB                    MAR
 
 # Documentation
 
+## X and Bluesky Store proof of concept
+
+Run `python src/store_poc.py --limit 3` from the repository root (substitute an
+available Python 3 executable if `python` is not on PATH). The script reads the
+existing ignored X bearer-token file, fetches recent posts from both test
+accounts, normalizes them, and upserts them into `.tmp/store_poc.sqlite3`.
+Use `--provider x` or `--provider bluesky` to test one source, and `--db` to
+choose another database path. It does not change the X polling cursor.
+
+Inspect stored counts without calling APIs or writing the database:
+`python src/store_poc.py --inspect`. `load_posts(conn)` restores saved common
+fields, raw objects, metadata and state for future processing; rule replay is
+not implemented yet.
+
+Run offline FR-2/FR-3 regression tests with
+`python -m unittest discover -s tests -p "test_*.py" -v`.
+Tests use synthetic posts and temporary databases and do not read credentials
+or touch the live Store database or polling cursors.
+
+Ingestion always runs the relevance stage after storage. Its MVP rule list is
+empty, so every stored post is marked as a review candidate. Candidate state
+is separate from publication approval; no automatic approval occurs.
+`src/relevance.py` supports injected boolean predicates for future rules,
+but no keyword/tag/provider rule or administrator workflow is implemented.
+
+Each row retains the source account, original ID, timestamp, text, URL, links,
+media, provider metadata, and the original API object. Rows start with
+`publication_status=pending`; duplicate grouping and priority are reserved for
+the later curation step. Repeated imports update the fetched content without
+resetting curation fields. The SQLite file is local and ignored by Git.
+
 Project documentation is maintained through the team's shared Google Drive and GitHub repository.
 
 The repository is intended to contain:

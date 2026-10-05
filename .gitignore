@@ -41,6 +41,11 @@ Thumbs.db
 
 *.tmp
 *.log
+*.sqlite3
+*.sqlite3-*
+*.sqlite
+*.db
+.tmp/
 
 # Local repository setup script
 setup_repo.py
