@@ -198,6 +198,39 @@ JAN                    FEB                    MAR
 
 # Documentation
 
+## Primary developer verification
+
+From the repository root:
+
+```powershell
+python run_tests.py
+python run_demo.py
+```
+
+The test entry point runs all automated unittest modules under `tests/` and
+returns a nonzero exit code on failure. The demo menu shows FR-1–5 behavior.
+Choose **6** for all safe offline demos, including simulated ingestion and
+offline replay: no APIs, credentials, real Store writes or cursor changes.
+Choose **1** for explicitly confirmed live X/Bluesky ingestion; it reports
+counts and uses a temporary database. LinkedIn is pending and no scheduler exists.
+See [manual verification guide](docs/manual_sanity.md) for expected results,
+inspection steps, and a session-only Python alias if your PATH lacks `python`.
+
+Option **7** demonstrates FR-6/FR-7 Option A: a fixture operator explicitly
+selects one duplicate-group representative. The isolated SQLite approval
+records actor/time, preserves all source records, and blocks a conflicting
+second selection. Option 6 includes this demo. The service is internal;
+administrator authentication/UI, replacement/withdrawal and website publishing
+are not implemented. No real post is approved by these demos.
+
+Option **8** demonstrates scheduled X/Bluesky polling with a fake clock:
+durable checkpoints, interval/restart handling and independent source failures.
+`python run_polling.py --once` uses the disabled example configuration and makes
+no requests or database changes. Live scheduling requires enabled sources,
+explicit intervals and `--live`; no production frequency is selected for you.
+See [polling and Docker packaging](docs/polling_and_deployment.md).
+LinkedIn remains planned: **API access pending**; policy review is separate.
+
 ## X and Bluesky Store proof of concept
 
 Run `python src/store_poc.py --limit 3` from the repository root (substitute an
@@ -215,8 +248,8 @@ Default relevance and exact-match duplicate stages can now be replayed offline
 using `python src/store_poc.py --reprocess`; source and editorial fields remain unchanged.
 See [manual sanity commands](docs/manual_sanity.md) for an isolated duplicate demo.
 
-Run offline FR-2/FR-3 regression tests with
-`python -m unittest discover -s tests -p "test_*.py" -v`.
+Run automated verification with `python run_tests.py` and readable offline demos
+with `python run_demo.py` (option 6).
 Tests use synthetic posts and temporary databases and do not read credentials
 or touch the live Store database or polling cursors.
 
@@ -249,3 +282,7 @@ The repository is intended to contain:
 
 **Shared Google Drive:**  
 https://drive.google.com/drive/folders/18Og0OanPjyRoiOnd3dT5Sb8wzWtRQ5Kw?usp=sharing
+
+## Browser admin and public feed
+
+Run `python run_app.py` from the repository root. Enter an admin password at the hidden prompt if `ASAP_ADMIN_PASSWORD` is unset. Open http://localhost:5000/admin and http://localhost:5000/feed. Existing X/Bluesky SQLite data is used; launch makes no API requests. Approve/reject/withdraw, duplicate representative selection, manual announcements, pin/order, presentation and source configuration are available. See [browser application](docs/browser_application.md).

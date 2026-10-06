@@ -1,0 +1,10 @@
+{
+  "sources": [
+    {"platform": "x", "account": "2100252721475448832", "enabled": false,
+     "interval_seconds": null, "page_size": 5,
+     "token_file": "asap_test_lab_x_twitter_bearer_token.txt"},
+    {"platform": "bluesky", "account": "asaptestlab.bsky.social", "enabled": false,
+     "interval_seconds": null, "page_size": 5},
+    {"platform": "linkedin", "enabled": false}
+  ]
+}

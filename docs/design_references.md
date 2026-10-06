@@ -6,7 +6,7 @@ These states describe design influence, independently of FR implementation progr
 
 | Reference | Status | Short note |
 | --- | --- | --- |
-| REF-HORIZON-01 | Under evaluation | Provider contract proposed; no contract implemented yet. |
+| REF-HORIZON-01 | Partially adopted/adapted | Provider-independent fetch contract implemented independently; concept adopted, no reference code copied. |
 | REF-HORIZON-02 | Partially adopted/adapted | Shared provider-independent POC representation; independent code, no Horizon fields/classes copied. |
 | REF-HORIZON-03 | Partially adopted/adapted | Replaceable processing stage aligns with design; pass-through is Tim's decision, independently implemented. |
 | REF-HORIZON-04 | Partially adopted/adapted | Separate duplicate stage implemented independently; no digest merge/scoring copied. |
@@ -33,3 +33,17 @@ Horizon has no evident Bluesky or LinkedIn scraper in the inspected source list.
 If code is ever copied later, record the exact Horizon commit/path, copy extent, MIT attribution, and license compatibility in the change. A conceptual `REF-HORIZON-n` tag alone does not mean code was copied.
 
 FR-5 implementation trace: `src/duplicates.py` uses REF-HORIZON-04 solely for stage separation. Conservative exact-text matching was authorized by Tim as a reversible engineering default; stable hashing, separate SQLite memberships and offline replay are independent implementation details. No Horizon code or digest behavior was copied. Similarity thresholds, automatic representative selection and source priority remain unresolved.
+
+Root verification entry points and readable FR demos are independent implementation; no new Horizon reference is adopted. FR-9 iframe customization is stakeholder feedback relayed by Tim from Thomas, not an external design reference or copied implementation. It is recorded in requirements/architecture while the integration contract remains open.
+
+Option A selection comes from Tim's explicit FR-6/FR-7 decision. `src/editorial.py` and its demo/tests are independent implementation. No Horizon ranking, automatic representative choice, or digest merge behavior is adopted. Existing REF-HORIZON-04 remains limited to duplicate-stage separation; it does not define editorial policy.
+
+## Provider implementation sources
+
+The X adapter uses the official [user-post endpoint documentation](https://docs.x.com/x-api/users/get-posts). The Bluesky adapter follows the official [getAuthorFeed lexicon](https://github.com/bluesky-social/atproto/blob/main/lexicons/app/bsky/feed/getAuthorFeed.json). These are protocol references, not requirements or copied implementation code. REF-HORIZON-01 is conceptual inspiration for the independently implemented provider contract; scheduler/transaction behavior is project implementation work.
+
+The [LinkedIn restricted-use documentation](https://learn.microsoft.com/en-us/linkedin/marketing/restricted-use-cases?view=li-lms-2026-09) is recorded as policy context for separate review. It does not change the pending API integration architecture or authorize downstream use.
+
+## Browser vertical slice
+
+FR-6/7/9/11 web/editorial components are independent project implementation using Python's standard library. No new external design reference was used and no external reference code was copied. Existing REF-HORIZON tags remain conceptual references for earlier provider/model/detection stages.

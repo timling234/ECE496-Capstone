@@ -57,10 +57,10 @@ def fetch_bluesky(limit):
 
 # FR-2: Common post representation
 # REF-HORIZON-02: provider-independent content model (adapted concept; independent code)
-def normalize_x(post, media):
+def normalize_x(post, media, account_id=X_USER_ID):
     keys = post.get("attachments", {}).get("media_keys", [])
     return {
-        "platform": "x", "account_id": X_USER_ID, "post_id": post["id"],
+        "platform": "x", "account_id": account_id, "post_id": post["id"],
         "created_at": post.get("created_at"), "text": post.get("text", ""),
         "post_url": f"https://x.com/i/web/status/{post['id']}",
         "links": [u.get("expanded_url") or u.get("url") for u in post.get("entities", {}).get("urls", [])],
@@ -72,13 +72,13 @@ def normalize_x(post, media):
 
 # FR-2: Common post representation
 # REF-HORIZON-02: provider-independent content model (adapted concept; independent code)
-def normalize_bluesky(item):
+def normalize_bluesky(item, fallback_handle=BSKY_HANDLE):
     post = item["post"]
     record = post.get("record", {})
     author = post.get("author", {})
     uri = post["uri"]
     rkey = uri.rsplit("/", 1)[-1]
-    handle = author.get("handle", BSKY_HANDLE)
+    handle = author.get("handle", fallback_handle)
     facets = record.get("facets", [])
     links = [feature["uri"] for facet in facets for feature in facet.get("features", []) if feature.get("$type") == "app.bsky.richtext.facet#link" and "uri" in feature]
     embed = post.get("embed", {})
