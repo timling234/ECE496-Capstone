@@ -47,3 +47,12 @@ The [LinkedIn restricted-use documentation](https://learn.microsoft.com/en-us/li
 ## Browser vertical slice
 
 FR-6/7/9/11 web/editorial components are independent project implementation using Python's standard library. No new external design reference was used and no external reference code was copied. Existing REF-HORIZON tags remain conceptual references for earlier provider/model/detection stages.
+
+## Operational tooling references
+
+| Reference | Adoption status | Use |
+| --- | --- | --- |
+| REF-BSKY-POST-01: [Official creating-a-post tutorial](https://docs.bsky.app/docs/tutorials/creating-a-post) and [API session introduction](https://docs.bsky.app/docs/get-started) | Adopted | Protocol fields/endpoints for an independently implemented, explicit-test-account publisher. Live verification awaits local credentials. |
+| REF-X-AUTH-01: [Official authentication mapping](https://docs.x.com/fundamentals/authentication/guides/v2-authentication-mapping) and [Create Posts](https://docs.x.com/x-api/posts/create-post) | Under evaluation | Current read-token code does not establish user-context write permission; X test posting remains pending. |
+
+Jenkins/GitLab/Grafana were user-specified visual direction, not copied source code. Test command allowlisting/runtime coordination are independent project implementation. Protocol references remain separate from stakeholder requirements.

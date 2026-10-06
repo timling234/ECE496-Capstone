@@ -1,3 +1,5 @@
+> Current operation: see [operations console](operations_console.md). `run_app.py` now owns polling; the standalone worker is an advanced CLI utility.
+
 # Browser application
 
 From the ECE496 repository root:
@@ -12,7 +14,7 @@ If `ASAP_ADMIN_PASSWORD` is already set, it is used. Otherwise enter a password 
 - Public feed: http://localhost:5000/feed
 - Mock embedding page: http://localhost:5000/embed-demo
 
-The default database is the existing `.tmp/store_poc.sqlite3`, containing the previously fetched X/Bluesky posts. `--db PATH` selects another Store; `--port NUMBER` changes the port. Launch does not fetch APIs. It initializes separate derived/editorial tables and reprocesses stored candidates with current MVP rules; original source rows are retained.
+The default database is the existing `.tmp/store_poc.sqlite3`, containing the previously fetched X/Bluesky posts. `--db PATH` selects another Store; `--port NUMBER` changes the port. Launch now runs polling for explicitly enabled sources. It initializes separate derived/editorial tables and reprocesses stored candidates with current MVP rules; original source rows are retained.
 
 ## Try it
 
@@ -23,9 +25,9 @@ The default database is the existing `.tmp/store_poc.sqlite3`, containing the pr
 5. Create a manual announcement. It starts pending. Approve it to publish; editing requires review again. Previous manual text is retained.
 6. Approved items support pin/unpin and a numeric manual order. Smaller positive numbers come first; 0 uses newest-first. Pins come before unpinned items.
 7. Feed appearance changes link color, font size and origin visibility without modifying stored source/editorial data.
-8. Source configuration saves account/enabled/interval settings to the database directory's `polling.local.json`. Restart the separate polling worker with this file to apply changes. Saving is not a live fetch. The existing token file reference is preserved and its contents are never displayed.
+8. Source configuration saves account/enabled/interval settings to the database directory's `polling.local.json`. The app-owned worker applies saved settings without restart; enabling a source starts live polling. The existing token file reference is preserved and its contents are never displayed.
 
-Source configuration worker example (explicit live requests):
+Advanced standalone worker example (do not run alongside the integrated app against the same Store):
 
 ```powershell
 python run_polling.py --config .tmp/polling.local.json --db .tmp/store_poc.sqlite3 --live
@@ -40,4 +42,4 @@ python run_tests.py
 python run_demo.py
 ```
 
-73 tests pass. HTTP acceptance tests exercise login, CSRF refusal, favicon-session regression, publication/withdrawal, configuration, iframe route, duplicate switching, manual lifecycle, ordering and presentation separation. Browser checks verified real stored content using a disposable copied database, preserving the original database's source records.
+81 tests pass. HTTP acceptance tests exercise login, CSRF refusal, favicon-session regression, publication/withdrawal, configuration, iframe route, duplicate switching, manual lifecycle, ordering and presentation separation. Browser checks verified real stored content using a disposable copied database, preserving the original database's source records.

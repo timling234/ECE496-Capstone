@@ -1,12 +1,12 @@
 # MVP closure audit
 
-Current audit: 73 tests pass via `python run_tests.py`; branch `dev`; existing work preserved. No commits/pushes authorized. This audit replaces optional-enhancement-driven yellow statuses. Historical milestone logs remain historical.
+Current audit: 81 tests pass via `python run_tests.py`; branch `beta` (current user-checkpointed branch); existing work preserved. No commits/pushes authorized. This audit replaces optional-enhancement-driven yellow statuses. Historical milestone logs remain historical.
 
 ## Acceptance boundaries and remaining required work
 
 | FR | Closure result / remaining acceptance work | Classification |
 | --- | --- | --- |
-| FR-1 | X/Bluesky configurable scheduled ingestion, pagination, atomic checkpoints, independent failure handling and safe status reporting are implemented and verified. | LinkedIn: ⏸ EXTERNAL BLOCKER — API access pending. Production default polling frequency still needs confirmation; runtime accepts explicit intervals. |
+| FR-1 | X/Bluesky configurable scheduled ingestion, pagination, atomic checkpoints, independent failure handling and safe status reporting are implemented and verified. | LinkedIn: ⏸ EXTERNAL BLOCKER — API access pending. Default 1800-second interval is confirmed in the operations request; shorter explicit intervals remain supported. |
 | FR-2 | Shared ten fields for currently accessible X/Bluesky text/link/image posts, missing optional fields, retained originals; normalization fixtures/demos pass. | Done for current MVP. LinkedIn mapping/validation externally blocked, not a blocker for the common model. |
 | FR-3 | Durable current raw/common records, separate processing/editorial state, provider-ID uniqueness, reopen, rollback and replay with decisions preserved; tests pass. | Done for current MVP. Source-version archives are a deferred enhancement, not a current closure gate. |
 | FR-4 | Generic configurable stage; empty rules allow all; injected predicates evaluate candidacy; originals and approval are unchanged; tests pass. | Done. Keyword/tag rules deferred. Required administrator removal/rejection belongs to FR-7; feed exclusion belongs to FR-9. |
@@ -69,3 +69,13 @@ FR-6: newest-first deterministic default, manual pin and explicit numeric order 
 Implementation: `src/web_app.py`, `src/web_editorial.py`, `run_app.py`. No new external REF code/reference was used. Existing exact-match processing and SQLite provenance are reused. `tests/test_web_app.py` verifies the HTTP session/CSRF/editorial path, regression for browser favicon requests, group switching, source preservation, persistence, manual edits, order, presentation and configuration. Full suite: **73 tests pass**. Browser verification used a disposable copy of the six real stored X/Bluesky posts: approve → public image/link appears; withdraw → disappears. Two preview-only manual announcements verified duplicate selection → exactly one public copy. Original Store source records remained unchanged.
 
 Run instructions: [browser application](browser_application.md). Existing outstanding notification/deployment/scope decisions are recorded separately; already confirmed console/lifecycle/manual-announcement choices are no longer pending.
+
+## Operational admin milestone (2026-10-06)
+
+Current operation is now **one command: `python run_app.py`**. The app owns a single runtime polling worker, reads saved settings continuously, and applies source/account/enabled/interval changes without a second terminal or restart. The current default is 1800 seconds, explicitly confirmed by the operational-console request; 3 seconds remains valid for short testing. Fetch Now, live source status, fetched/new counts, safe errors, worker/dashboard health and a compact engineering console are implemented. This supersedes earlier instructions requiring a separate polling process or restart to apply Admin settings.
+
+FR-1/7 runtime controls are verified with real browser Bluesky fetching: 5 fetched / 2 newly discovered; the new paper post becomes a pending review candidate. Three-second scheduled polling and disabling were browser-verified. Existing editorial/provenance logic is retained. FR-10 development tooling uses real allowlisted tests with timeout/redaction, persisted results and no arbitrary shell input. The suite passes 81 tests. Real test publishing and candidate E2E are implemented and mock-verified, but their live verification is blocked only by missing explicit local Bluesky test credentials. Do not count mocked publishing as a successful real write. Development controls default off (`ASAP_DEV_TOOLS=1` explicitly enables them).
+
+Implementation boundaries: `src/app_runtime.py` (worker/configuration), `src/polling.py` (status/count migration and force/cooldown), `src/console_ui.py` / `src/web_app.py` (protected console/controls), `src/dev_tools.py` (allowlisted jobs/explicit test publisher), `run_app.py` (single launch/local credential helper), `tests/test_operations.py` (acceptance/security). No Horizon code is used in these new components; existing provider/model/detection concepts remain referenced separately. Official Bluesky protocol documentation and X authentication mapping are recorded in design references.
+
+See [operations console](operations_console.md) for current run/setup instructions, acceptance evidence and X posting investigation. LinkedIn remains **⏸ EXTERNAL BLOCKER — API access pending**. No LinkedIn alternatives, keyword rules, fuzzy duplicate policy, source priority, production deployment, commit or push were introduced.

@@ -9,7 +9,7 @@ This is a living design, revised as implementation and stakeholder feedback prov
 | X / Bluesky adapters | 🟢 Done | Configurable accounts, shared normalized output and incremental pagination verified with mocked API responses. |
 | Common normalization | 🟢 Done | X/Bluesky MVP mappings verified; LinkedIn validation alone is externally blocked. |
 | SQLite ingest store | 🟢 Done | Current payload/common fields/state, restart, idempotency, replay and rollback verified; version archives deferred. |
-| Scheduler / provider contract | 🟢 Done | Explicit intervals, atomic per-source checkpoints, restart scheduling, failure isolation and rate-limit waits verified. |
+| App-owned scheduler / provider contract | 🟢 Done | Runtime enable/interval/Fetch Now, live status/counts, atomic checkpoints, failure isolation and rate-limit cooldowns verified. |
 | Docker packaging | 🟡 In Progress | Files prepared; image build/run verification blocked by local engine access. |
 | LinkedIn adapter | ⏸ External Blocker | API access unavailable; current-provider work continues independently. |
 | Relevance stage | 🟢 Done | Configurable default-pass-through stage verified; actual keyword/tag rules deferred; admin actions belong to FR-7. |
@@ -18,7 +18,9 @@ This is a living design, revised as implementation and stakeholder feedback prov
 | Admin UI / authentication / replacement / withdrawal / order | 🟢 Done | Confirmed single-admin login/session/CSRF, editorial controls, pin/order and source configuration verified. |
 | Notifications | ❓ Decision Needed | Channel and recipients require confirmation. |
 | Customizable iframe renderer | 🟢 Done | Local approved-only feed and embedding route; configurable link color/font/origin; production installation remains deployment work. |
-| Developer verification harness | 🟢 Done | Root test runner and FR-1–5 menu verified; this completed utility does not mean whole FR-10 is Done. |
+| Developer verification harness / test console | 🟢 Done | CLI and real allowlisted browser regression jobs, duration/history, timeout and redaction verified. |
+| Bluesky development publisher / E2E | 🟡 In Progress | Implementation and mocked acceptance verified; real write/E2E validation needs explicit local test-account credentials. |
+| X development posting | ⚪ Planned | Investigated: current code lacks verified user-context write authorization; does not block Bluesky. |
 | Manual announcements | 🟢 Done | Create/edit/review/approve/withdraw and prior-text retention verified. |
 | Site separation | ❓ Decision Needed | Multi-site scope still recorded separately. |
 
@@ -129,3 +131,13 @@ FR-6: newest-first deterministic default, manual pin and explicit numeric order 
 Implementation: `src/web_app.py`, `src/web_editorial.py`, `run_app.py`. No new external REF code/reference was used. Existing exact-match processing and SQLite provenance are reused. `tests/test_web_app.py` verifies the HTTP session/CSRF/editorial path, regression for browser favicon requests, group switching, source preservation, persistence, manual edits, order, presentation and configuration. Full suite: **73 tests pass**. Browser verification used a disposable copy of the six real stored X/Bluesky posts: approve → public image/link appears; withdraw → disappears. Two preview-only manual announcements verified duplicate selection → exactly one public copy. Original Store source records remained unchanged.
 
 Run instructions: [browser application](browser_application.md). Existing outstanding notification/deployment/scope decisions are recorded separately; already confirmed console/lifecycle/manual-announcement choices are no longer pending.
+
+## Operational admin milestone (2026-10-06)
+
+Current operation is now **one command: `python run_app.py`**. The app owns a single runtime polling worker, reads saved settings continuously, and applies source/account/enabled/interval changes without a second terminal or restart. The current default is 1800 seconds, explicitly confirmed by the operational-console request; 3 seconds remains valid for short testing. Fetch Now, live source status, fetched/new counts, safe errors, worker/dashboard health and a compact engineering console are implemented. This supersedes earlier instructions requiring a separate polling process or restart to apply Admin settings.
+
+FR-1/7 runtime controls are verified with real browser Bluesky fetching: 5 fetched / 2 newly discovered; the new paper post becomes a pending review candidate. Three-second scheduled polling and disabling were browser-verified. Existing editorial/provenance logic is retained. FR-10 development tooling uses real allowlisted tests with timeout/redaction, persisted results and no arbitrary shell input. The suite passes 81 tests. Real test publishing and candidate E2E are implemented and mock-verified, but their live verification is blocked only by missing explicit local Bluesky test credentials. Do not count mocked publishing as a successful real write. Development controls default off (`ASAP_DEV_TOOLS=1` explicitly enables them).
+
+Implementation boundaries: `src/app_runtime.py` (worker/configuration), `src/polling.py` (status/count migration and force/cooldown), `src/console_ui.py` / `src/web_app.py` (protected console/controls), `src/dev_tools.py` (allowlisted jobs/explicit test publisher), `run_app.py` (single launch/local credential helper), `tests/test_operations.py` (acceptance/security). No Horizon code is used in these new components; existing provider/model/detection concepts remain referenced separately. Official Bluesky protocol documentation and X authentication mapping are recorded in design references.
+
+See [operations console](operations_console.md) for current run/setup instructions, acceptance evidence and X posting investigation. LinkedIn remains **⏸ EXTERNAL BLOCKER — API access pending**. No LinkedIn alternatives, keyword rules, fuzzy duplicate policy, source priority, production deployment, commit or push were introduced.

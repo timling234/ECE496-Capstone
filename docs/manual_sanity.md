@@ -11,7 +11,7 @@ python run_tests.py
 python run_demo.py
 ```
 
-The test runner currently reports `Ran 73 tests` and `OK`. It returns nonzero if a test fails or cannot import. It discovers unittest modules in all subfolders of `tests/` using `test_*.py` or `*_test.py`; existing API POC scripts are not automatically executed as live requests.
+The test runner currently reports `Ran 81 tests` and `OK`. It returns nonzero if a test fails or cannot import. It discovers unittest modules in all subfolders of `tests/` using `test_*.py` or `*_test.py`; existing API POC scripts are not automatically executed as live requests.
 
 The menu has FR-1 through FR-5, **6. Run all safe offline demos**, and **0. Exit**. Option 6 runs simulated ingestion, normalization, storage, filtering, duplicate detection and offline replay. Every offline path uses fixtures and temporary databases. No credentials, APIs, real Store or cursors are used. The temporary databases are removed afterward.
 
@@ -207,3 +207,13 @@ FR-6: newest-first deterministic default, manual pin and explicit numeric order 
 Implementation: `src/web_app.py`, `src/web_editorial.py`, `run_app.py`. No new external REF code/reference was used. Existing exact-match processing and SQLite provenance are reused. `tests/test_web_app.py` verifies the HTTP session/CSRF/editorial path, regression for browser favicon requests, group switching, source preservation, persistence, manual edits, order, presentation and configuration. Full suite: **73 tests pass**. Browser verification used a disposable copy of the six real stored X/Bluesky posts: approve → public image/link appears; withdraw → disappears. Two preview-only manual announcements verified duplicate selection → exactly one public copy. Original Store source records remained unchanged.
 
 Run instructions: [browser application](browser_application.md). Existing outstanding notification/deployment/scope decisions are recorded separately; already confirmed console/lifecycle/manual-announcement choices are no longer pending.
+
+## Operational admin milestone (2026-10-06)
+
+Current operation is now **one command: `python run_app.py`**. The app owns a single runtime polling worker, reads saved settings continuously, and applies source/account/enabled/interval changes without a second terminal or restart. The current default is 1800 seconds, explicitly confirmed by the operational-console request; 3 seconds remains valid for short testing. Fetch Now, live source status, fetched/new counts, safe errors, worker/dashboard health and a compact engineering console are implemented. This supersedes earlier instructions requiring a separate polling process or restart to apply Admin settings.
+
+FR-1/7 runtime controls are verified with real browser Bluesky fetching: 5 fetched / 2 newly discovered; the new paper post becomes a pending review candidate. Three-second scheduled polling and disabling were browser-verified. Existing editorial/provenance logic is retained. FR-10 development tooling uses real allowlisted tests with timeout/redaction, persisted results and no arbitrary shell input. The suite passes 81 tests. Real test publishing and candidate E2E are implemented and mock-verified, but their live verification is blocked only by missing explicit local Bluesky test credentials. Do not count mocked publishing as a successful real write. Development controls default off (`ASAP_DEV_TOOLS=1` explicitly enables them).
+
+Implementation boundaries: `src/app_runtime.py` (worker/configuration), `src/polling.py` (status/count migration and force/cooldown), `src/console_ui.py` / `src/web_app.py` (protected console/controls), `src/dev_tools.py` (allowlisted jobs/explicit test publisher), `run_app.py` (single launch/local credential helper), `tests/test_operations.py` (acceptance/security). No Horizon code is used in these new components; existing provider/model/detection concepts remain referenced separately. Official Bluesky protocol documentation and X authentication mapping are recorded in design references.
+
+See [operations console](operations_console.md) for current run/setup instructions, acceptance evidence and X posting investigation. LinkedIn remains **⏸ EXTERNAL BLOCKER — API access pending**. No LinkedIn alternatives, keyword rules, fuzzy duplicate policy, source priority, production deployment, commit or push were introduced.

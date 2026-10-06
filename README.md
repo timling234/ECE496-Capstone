@@ -285,4 +285,8 @@ https://drive.google.com/drive/folders/18Og0OanPjyRoiOnd3dT5Sb8wzWtRQ5Kw?usp=sha
 
 ## Browser admin and public feed
 
-Run `python run_app.py` from the repository root. Enter an admin password at the hidden prompt if `ASAP_ADMIN_PASSWORD` is unset. Open http://localhost:5000/admin and http://localhost:5000/feed. Existing X/Bluesky SQLite data is used; launch makes no API requests. Approve/reject/withdraw, duplicate representative selection, manual announcements, pin/order, presentation and source configuration are available. See [browser application](docs/browser_application.md).
+Run `python run_app.py` from the repository root. Enter an admin password at the hidden prompt if `ASAP_ADMIN_PASSWORD` is unset. Open http://localhost:5000/admin and http://localhost:5000/feed. Existing X/Bluesky SQLite data is used; enabled sources are polled by the app-owned worker. Approve/reject/withdraw, duplicate representative selection, manual announcements, pin/order, presentation and source configuration are available. See [browser application](docs/browser_application.md).
+
+## Current operational launch
+
+`python run_app.py` now starts both the admin/public web application and polling for enabled sources. Runtime configuration, Fetch Now and source status are under **Sources**; no separate polling terminal is needed. Default interval is 1800 seconds; existing saved intervals are preserved. For development, set `$env:ASAP_DEV_TOOLS='1'` before launching to enable the real test runner and live test tools. One-time Bluesky test-account setup uses `python run_app.py --configure-bluesky-test` (hidden app-password input, ignored local file). See [operations console](docs/operations_console.md). Older separate-worker instructions are historical/advanced CLI usage.
