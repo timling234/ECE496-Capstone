@@ -14,6 +14,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 from .console_ui import render_console, STYLE
 from .dev_tools import DevTools
+from .source_config import configure_source, find_source, identity
 from .web_editorial import initialize, items, decide, publishable, create_announcement, edit_announcement, set_order, presentation, save_presentation
 
 def esc(value): return html.escape(str(value or ''),quote=True)
@@ -32,7 +33,9 @@ def page(title,body,settings=None,console=False):
         +(STYLE if console else '')+'body{font-size:'+str(settings['font_size'])+'px}a{color:'+settings['accent']+'}</style></head><body>'+('' if console else '<h1>'+esc(title)+'</h1>')+body+'</body></html>').encode()
 
 def card(p,csrf=None,show_origin=True):
-    body='<article><small>'+(esc(p['platform'])+' · '+esc(p['account_id'])+' · ' if show_origin else '')+esc(p['created_at'] or 'Time unavailable')+'</small>'
+    status=p.get('editorial_status','approved' if not csrf else 'pending')
+    label='PUBLISHED' if status=='approved' else 'REJECTED' if status=='rejected' else 'NEEDS REVIEW'
+    body='<article data-platform="'+esc(p['platform'])+'" data-post-id="'+esc(p['post_id'])+'"><span class="post-status badge '+('good' if status=='approved' else 'bad' if status=='rejected' else 'warn')+'">'+label+'</span><small>'+(esc(p['platform'])+' · '+esc(p['account_id'])+' · ' if show_origin else '')+esc(p['created_at'] or 'Time unavailable')+'</small>'
     body+='<p class="content">'+esc(p['text'])+'</p>'
     url=safe_url(p['post_url'])
     if url: body+='<a target="_blank" rel="noopener noreferrer" href="'+esc(url)+'">Original post</a>'
@@ -44,7 +47,8 @@ def card(p,csrf=None,show_origin=True):
         if url: body+='<p><img loading="lazy" referrerpolicy="no-referrer" src="'+esc(url)+'" alt="'+esc(media.get('alt','Source media'))+'"></p>'
     if csrf:
         body+='<p>Review: '+esc(p['candidate_status'])+' · Editorial: <b>'+esc(p['editorial_status'])+'</b></p>'
-        if p['group']: body+='<p><small>Duplicate group: '+esc(p['group'])+'</small></p>'
+        body+='<details class="source-details"><summary>Source details</summary><small>Post ID: '+esc(p['post_id'])+'<br>Source URL: '+esc(p['post_url'])+('<br>Internal duplicate key: '+esc(p['group']) if p['group'] else '')+'</small></details>'
+        if p.get('editorial_reason')=='duplicate_not_selected':body+='<p><small>Reason: duplicate_not_selected</small></p>'
         actions=['reject']
         if p['candidate_status']=='candidate': actions.insert(0,'approve')
         if p['editorial_status']=='approved': actions=['withdraw','reject','unpin' if p['pinned'] else 'pin']
@@ -112,13 +116,15 @@ def make_server(db,password,host='127.0.0.1',port=5000,runtime=None,dev_enabled=
             session=self.session()
             if not session or not session['authenticated']: return self.redirect('/login')
             if route!='/admin': return self.send(404,page('Not found',''))
-            view=parse_qs(parsed.query).get('view',['dashboard'])[0]
+            query=parse_qs(parsed.query)
+            view=query.get('view',['dashboard'])[0]
+            if view=='duplicates':return self.redirect('/admin?view=pending&filters_set=1&duplicates=1')
             with closing(self.db_connection()) as conn:
                 posts=items(conn)
                 settings=presentation(conn)
                 history=conn.execute('SELECT action,platform,post_id,actor,acted_at FROM editorial_actions ORDER BY id DESC LIMIT 20').fetchall()
             body=render_console(posts,history,settings,read_config(),session,view,esc,card,runtime,devtools,
-                parse_qs(parsed.query).get('notice',[''])[0])
+                query.get('notice',[''])[0],query=query)
             self.send(200,page('ASAP Admin',body,console=True))
         def do_POST(self):
             session=self.session()
@@ -149,20 +155,33 @@ def make_server(db,password,host='127.0.0.1',port=5000,runtime=None,dev_enabled=
                         devtools.submit(value('test_id'),value('text'))
                         return self.redirect('/admin?view=testing')
                     if not runtime:raise ValueError('Polling runtime is not active in this server')
-                    platform=value('platform')
-                    if route=='/fetch':runtime.request_fetch(platform)
+                    key=value('source_key') or value('platform')
+                    if route=='/fetch':runtime.request_fetch(key)
                     else:
                         config=runtime.read_config()
-                        source=next((s for s in config['sources'] if s['platform']==platform and platform in ('x','bluesky')),None)
+                        source=find_source(config,key)
+                        if source is None and key in ('x','bluesky'):
+                            matches=[s for s in config['sources'] if s['platform']==key]
+                            source=matches[0] if len(matches)==1 else None
+                        if source and source['platform']=='linkedin':raise ValueError('LinkedIn API access pending')
                         if source is None:raise ValueError('Source not configured')
                         source['enabled']=not source.get('enabled',False)
                         source['interval_seconds']=source.get('interval_seconds') or 1800
                         runtime.save_config(config)
                     return self.redirect('/admin?view=sources')
                 except ValueError as exc:return self.send(400,page('Operation unavailable',esc(exc)))
+            if route=='/source-save':
+                try:
+                    config=read_config()
+                    configure_source(config,{k:value(k) for k in ('provider','account','interval_seconds','enabled','page_size')},value('source_key') or None)
+                    if not runtime:raise ValueError('Source management requires the app polling runtime')
+                    runtime.save_config(config)
+                except ValueError as exc:return self.send(400,page('Invalid source configuration',esc(exc)))
+                return self.redirect('/admin?view=sources')
             if route=='/sources':
                 try:
                     config=read_config()
+                    if any(sum(s['platform']==platform for s in config['sources'])>1 for platform in ('x','bluesky')):raise ValueError('Use per-source editing when multiple accounts are configured')
                     for source in config['sources']:
                         platform=source['platform']
                         if platform not in ('x','bluesky'):continue
@@ -195,7 +214,7 @@ def make_server(db,password,host='127.0.0.1',port=5000,runtime=None,dev_enabled=
             try:
                 with closing(self.db_connection()) as conn:decide(conn,value('platform'),value('post_id'),value('action'))
             except ValueError as exc:return self.send(400,page('Action unavailable',esc(exc)))
-            self.redirect('/admin')
+            self.redirect('/admin?view=pending')
     server=ThreadingHTTPServer((host,port),Handler)
     cookie_name="asap_session_"+str(server.server_port)
     server.runtime=runtime;server.devtools=devtools

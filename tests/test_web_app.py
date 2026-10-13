@@ -34,7 +34,7 @@ class EditorialWebTests(unittest.TestCase):
         self.assertEqual([(p['platform'],p['post_id']) for p in publishable(self.conn)],[('bluesky',b['post_id'])])
         decide(self.conn,'bluesky',b['post_id'],'reject');self.assertEqual(publishable(self.conn),[])
         self.assertEqual(self.conn.execute('SELECT * FROM posts ORDER BY platform,post_id').fetchall(),self.original)
-        self.assertEqual(self.conn.execute('SELECT count(*) FROM editorial_actions').fetchone()[0],6)
+        self.assertEqual(self.conn.execute('SELECT count(*) FROM editorial_actions').fetchone()[0],7)
     def test_changed_source_requires_review_and_reopen_persists(self):
         """Verifies FR-7/9: stored approval persists, changed content is not published."""
         decide(self.conn,'x','C','approve')

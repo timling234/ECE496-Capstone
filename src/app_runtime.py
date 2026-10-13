@@ -9,6 +9,7 @@ from pathlib import Path
 from run_polling import load_sources
 from .polling import poll_due, PollingSource
 from .store_poc import ROOT
+from .source_config import identity
 
 
 class AppRuntime:
@@ -66,21 +67,26 @@ class AppRuntime:
     @property
     def running(self):return bool(self.thread and self.thread.is_alive())
 
-    def request_fetch(self, platform):
-        if platform not in ('x','bluesky'):raise ValueError('Only configured X/Bluesky sources can be fetched')
-        if not any(s.provider.platform==platform for s in self.sources()):raise ValueError('Source not configured')
-        with self.lock:
-            if platform in self.pending or self.active==platform:return False
-            self.pending.add(platform)
-        self.commands.put(platform);self.wake.set();return True
+    def resolve(self, key):
+        sources=self.sources()
+        exact=next((s for s in sources if s.provider.key==key),None)
+        if exact:return exact
+        matches=[s for s in sources if s.provider.platform==key]
+        if len(matches)==1:return matches[0]
+        raise ValueError('Select a specific configured source/account')
 
-    def fetch_now(self, platform):
-        # Same serialized pipeline for development E2E; never auto-approves.
+    def request_fetch(self, key):
+        source=self.resolve(key);key=source.provider.key
+        with self.lock:
+            if key in self.pending or self.active==key:return False
+            self.pending.add(key)
+        self.commands.put(key);self.wake.set();return True
+
+    def fetch_now(self, key):
         with self.poll_lock:
-            source=next((s for s in self.sources() if s.provider.platform==platform),None)
-            if source is None:raise ValueError('Source not configured')
+            source=self.resolve(key)
             source=PollingSource(source.provider,source.interval_seconds or 1800,True)
-            self.active=platform
+            self.active=source.provider.key
             try:
                 with closing(sqlite3.connect(self.db,timeout=15)) as conn:
                     return poll_due(conn,[source],time.time(),force=True)[0]
@@ -103,7 +109,7 @@ class AppRuntime:
                 if len({source.provider.key for source in sources})!=len(sources):raise ValueError('Duplicate configured source')
                 outcomes=[]
                 for source in sources:
-                    self.active=source.provider.platform if source.enabled else None
+                    self.active=source.provider.key if source.enabled else None
                     try:outcomes.extend(poll_due(conn,[source],now))
                     finally:self.active=None
             self.error=None
@@ -120,8 +126,8 @@ class AppRuntime:
         for source in config['sources']:
             platform=source['platform'];key=platform+':'+source.get('account','')
             row=dict(source);row.update(states.get(key,{}))
-            row['status']=('Pending Access' if platform=='linkedin' else 'Fetching' if self.active==platform
-                else 'Queued' if platform in self.pending else 'Error' if row.get('error_type')
+            row['status']=('Pending Access' if platform=='linkedin' else 'Fetching' if self.active==key
+                else 'Queued' if key in self.pending else 'Error' if row.get('error_type')
                 else 'Disabled' if not source.get('enabled') else 'Healthy' if row.get('last_success_at') is not None else 'Waiting')
             rows.append(row)
         return rows

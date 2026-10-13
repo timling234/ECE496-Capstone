@@ -162,7 +162,7 @@ class OperationsTests(unittest.TestCase):
         deadline=time.monotonic()+3
         while not self.provider.calls and time.monotonic()<deadline:time.sleep(.02)
         self.assertEqual(self.provider.calls,1)
-        self.assertIn('Live source status',get('/admin?view=sources'))
+        self.assertIn('Fetch Now',get('/admin?view=sources'))
         self.assertIn('Run All Regression Tests',get('/admin?view=testing'))
 
 

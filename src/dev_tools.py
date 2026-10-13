@@ -149,7 +149,7 @@ class DevTools:
                 if test_id=='e2e-bluesky':
                     deadline=time.monotonic()+60;found=False
                     while time.monotonic()<deadline:
-                        outcome=self.runtime.fetch_now('bluesky')
+                        outcome=self.runtime.fetch_now('bluesky:'+credentials()[0])
                         with closing(sqlite3.connect(self.db)) as conn:
                             row=conn.execute("SELECT p.text,r.status FROM posts p JOIN relevance r USING(platform,post_id) WHERE p.platform='bluesky' AND p.post_id=?",(result['uri'],)).fetchone()
                         if row==(text,'candidate'):found=True;break

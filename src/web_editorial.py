@@ -12,6 +12,7 @@ def initialize(conn):
       platform TEXT NOT NULL, post_id TEXT NOT NULL, status TEXT NOT NULL,
       fingerprint TEXT NOT NULL, actor TEXT NOT NULL, decided_at TEXT NOT NULL,
       PRIMARY KEY(platform,post_id));
+    CREATE TABLE IF NOT EXISTS editorial_reasons (platform TEXT NOT NULL, post_id TEXT NOT NULL, reason TEXT, PRIMARY KEY(platform,post_id));
     CREATE TABLE IF NOT EXISTS feed_settings (id INTEGER PRIMARY KEY CHECK(id=1), accent TEXT NOT NULL, font_size INTEGER NOT NULL, show_origin INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS manual_versions (id INTEGER PRIMARY KEY, post_id TEXT NOT NULL, text TEXT NOT NULL, actor TEXT NOT NULL, saved_at TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS feed_order (platform TEXT NOT NULL, post_id TEXT NOT NULL, pinned INTEGER NOT NULL DEFAULT 0, position INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(platform,post_id));
@@ -32,9 +33,11 @@ def items(conn):
     groups={(a,b):g for a,b,g in conn.execute('SELECT * FROM duplicate_candidates')}
     decisions={(r[0],r[1]):r for r in conn.execute('SELECT * FROM editorial_decisions')}
     ordering={(a,b):(p,n) for a,b,p,n in conn.execute('SELECT * FROM feed_order')}
+    reasons={(a,b):r for a,b,r in conn.execute('SELECT * FROM editorial_reasons')} if table_exists(conn,'editorial_reasons') else {}
     for p in posts:
         p['pinned'],p['position']=ordering.get((p['platform'],p['post_id']),(0,0))
         key=(p['platform'],p['post_id']); d=decisions.get(key)
+        p['editorial_reason']=reasons.get(key)
         p['candidate_status']=relevance.get(key,'ingested')
         p['group']=groups.get(key)
         p['editorial_status']=d[2] if d else 'pending'
@@ -62,11 +65,13 @@ def decide(conn, platform, post_id, action, actor='admin'):
             conn.commit(); return
         changes=[(p,{'approve':'approved','reject':'rejected','withdraw':'pending'}[action],action)]
         if action=='approve' and p['group']:
-            changes += [(other,'pending','representative replaced') for other in posts
-                if other['group']==p['group'] and other is not p and other['editorial_status']=='approved']
+            changes += [(other,'rejected','duplicate_not_selected') for other in posts
+                if other['group']==p['group'] and (other['platform'],other['post_id'])!=(platform,post_id)
+                and other['editorial_status'] in ('pending','needs review','approved')]
         for target,status,event in changes:
             conn.execute('INSERT OR REPLACE INTO editorial_decisions VALUES (?,?,?,?,?,?)',
                 (target['platform'],target['post_id'],status,fingerprint(target),actor,now))
+            conn.execute('INSERT OR REPLACE INTO editorial_reasons VALUES (?,?,?)',(target['platform'],target['post_id'],event if event=='duplicate_not_selected' else action))
             conn.execute('INSERT INTO editorial_actions(platform,post_id,action,actor,acted_at) VALUES (?,?,?,?,?)',
                 (target['platform'],target['post_id'],event,actor,now))
         conn.commit()
