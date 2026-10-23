@@ -16,6 +16,7 @@ def main():
     parser.add_argument('--db',type=Path,default=ROOT/'.tmp'/'store_poc.sqlite3')
     parser.add_argument('--config',type=Path,help='Optional polling config; default is alongside the database')
     parser.add_argument('--configure-bluesky-test',action='store_true',help='Save explicit test-account credentials locally using hidden input')
+    parser.add_argument('--host',default='127.0.0.1',help='Container: 0.0.0.0; local default: loopback')
     parser.add_argument('--port',type=int,default=5000)
     args=parser.parse_args()
     if args.configure_bluesky_test:
@@ -37,7 +38,7 @@ def main():
     with closing(sqlite3.connect(args.db)) as conn:
         store(conn,[]);process_stored(conn);conn.commit();initialize(conn);conn.commit()
     runtime=AppRuntime(args.db,args.config)
-    server=make_server(args.db,password,port=args.port,runtime=runtime,dev_enabled=os.environ.get('ASAP_DEV_TOOLS')=='1')
+    server=make_server(args.db,password,host=args.host,port=args.port,runtime=runtime,dev_enabled=os.environ.get('ASAP_DEV_TOOLS')=='1')
     runtime.start()
     print(f'Admin:       http://localhost:{server.server_port}/admin')
     print(f'Public Feed: http://localhost:{server.server_port}/feed')

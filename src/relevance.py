@@ -28,6 +28,9 @@ def mark_candidates(conn, posts, rules=()):
         status TEXT NOT NULL CHECK(status IN ('candidate', 'filtered')),
         PRIMARY KEY(platform, post_id)
     )""")
+    # FR-8: candidate notification is committed or rolled back with relevance.
+    from .notifications import queue_candidates
+    queue_candidates(conn, results)
     conn.executemany("""INSERT INTO relevance VALUES (?, ?, ?)
         ON CONFLICT(platform, post_id) DO UPDATE SET status=excluded.status""", results)
     return [post for post, result in zip(posts, results) if result[2] == "candidate"]

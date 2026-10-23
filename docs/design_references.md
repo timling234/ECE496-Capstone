@@ -56,3 +56,10 @@ FR-6/7/9/11 web/editorial components are independent project implementation usin
 | REF-X-AUTH-01: [Official authentication mapping](https://docs.x.com/fundamentals/authentication/guides/v2-authentication-mapping) and [Create Posts](https://docs.x.com/x-api/posts/create-post) | Under evaluation | Current read-token code does not establish user-context write permission; X test posting remains pending. |
 
 Jenkins/GitLab/Grafana were user-specified visual direction, not copied source code. Test command allowlisting/runtime coordination are independent project implementation. Protocol references remain separate from stakeholder requirements.
+
+
+## REF-MSRG-NEWS — visual and integration reference
+
+Status: **Partially adopted/adapted**. Reference: [public Hugo homepage template](https://github.com/MSRG/msrg.github.io/blob/main/layouts/index.html), [live MSRG site](https://msrg.github.io/) and the user's News screenshot supplied 2026-10-13.
+
+Adopted: News heading/white rounded outer panel, horizontal responsive post cards, original-post links, and the template insertion point inside `content-panel news-panel`. Adapted: ASAP uses its own approved-only HTML `/feed` iframe and existing source records instead of the current Elfsight script/widget. Likes/comments/shares and LinkedIn retrieval are not inferred from the screenshot. No MSRG, Elfsight or other reference implementation copied. See [website_integration.md](website_integration.md) for the integration contract; requirements/status remain in functional_requirements.md rather than this reference record.

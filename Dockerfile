@@ -10,5 +10,7 @@ COPY --chown=asap:asap config/ ./config/
 COPY --chown=asap:asap run_tests.py run_demo.py run_polling.py run_app.py ./
 USER asap
 VOLUME ["/data"]
-# All example sources are disabled. No credentials or live requests by default.
-CMD ["python", "run_polling.py", "--db", "/data/asap.sqlite3"]
+# FR-7/8/9/10: credentials injected at runtime; persistent state on /data.
+EXPOSE 5000
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/feed',timeout=3).close()"
+CMD ["python", "run_app.py", "--host", "0.0.0.0", "--db", "/data/asap.sqlite3", "--port", "5000"]

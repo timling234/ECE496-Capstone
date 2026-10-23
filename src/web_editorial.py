@@ -82,7 +82,7 @@ def decide(conn, platform, post_id, action, actor='admin'):
 def publishable(conn):
     """FR-9: approved current candidates, at most one representative per group."""
     result=[]; seen=set()
-    for p in sorted(items(conn),key=lambda p:(p['pinned'],int(p['position']>0),-p['position'],p['created_at'] or '',p['platform'],p['post_id']),reverse=True):
+    for p in sorted(items(conn),key=lambda p:(p['pinned'],p['created_at'] or '',p['platform'],p['post_id']),reverse=True):
         if p['editorial_status']!='approved' or p['candidate_status']!='candidate': continue
         if p['group'] and p['group'] in seen: continue
         if p['group']: seen.add(p['group'])

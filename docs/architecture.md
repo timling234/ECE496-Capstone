@@ -10,7 +10,8 @@ This is a living design, revised as implementation and stakeholder feedback prov
 | Common normalization | 🟢 Done | X/Bluesky MVP mappings verified; LinkedIn validation alone is externally blocked. |
 | SQLite ingest store | 🟢 Done | Current payload/common fields/state, restart, idempotency, replay and rollback verified; version archives deferred. |
 | App-owned scheduler / provider contract | 🟢 Done | Runtime enable/interval/Fetch Now, live status/counts, atomic checkpoints, failure isolation and rate-limit cooldowns verified. |
-| Docker packaging | 🟡 In Progress | Files prepared; image build/run verification blocked by local engine access. |
+| Docker packaging | 🟢 Done | Integrated web/worker build/run, Linux tests, non-root and persistent volume verified. Public deployment remains separate. |
+| Email notifications | 🟢 Done | Settings, transactional outbox and retry verified; SMTP inbox validation awaits mail configuration. SMS 🔵 Deferred. |
 | LinkedIn adapter | ⏸ External Blocker | API access unavailable; current-provider work continues independently. |
 | Relevance stage | 🟢 Done | Configurable default-pass-through stage verified; actual keyword/tag rules deferred; admin actions belong to FR-7. |
 | Duplicate candidates | 🟢 Done | Exact matching/persistence verified; fuzzy strategy deferred; selection/public rendering belong to FR-6/9. |
@@ -102,7 +103,7 @@ The target is Thomas's static MSRG site: [repository](https://github.com/MSRG/ms
 
 ## Open decisions / dependencies
 
-LinkedIn access and account ownership; final iframe integration contract with Thomas; notification channel; actual relevance rules; fuzzy duplicate policy; replacement/withdrawal workflow after the approved Option A initial selection; changed-source handling; manual-announcement and multi-site MVP scope; administrator authentication; feed ordering; measurement boundary for the one-hour target. Keep these explicit in the proposal rather than treating draft choices as confirmed requirements.
+LinkedIn access and account ownership; public ASAP hostname/hosting and final iframe installation with Thomas; SMTP configuration/inbox validation (Email agreed, SMS deferred); actual relevance rules; fuzzy duplicate policy; replacement/withdrawal workflow after the approved Option A initial selection; changed-source handling; manual-announcement and multi-site MVP scope; administrator authentication; feed ordering; measurement boundary for the one-hour target. Keep these explicit in the proposal rather than treating draft choices as confirmed requirements.
 
 ## Traceability convention
 
@@ -118,7 +119,7 @@ The [restricted-use documentation](https://learn.microsoft.com/en-us/linkedin/ma
 
 The suite passes 66 tests. X/Bluesky adapters and the single-worker scheduler support explicit account/interval configuration, incremental pagination, atomic storage/processing/checkpoint updates, independent source failures, persisted restart scheduling and HTTP 429 retry timing. Empty configuration is disabled and performs no live requests or database changes. No production polling frequency has been selected. See [polling and deployment](polling_and_deployment.md).
 
-Docker packaging is prepared, but image build/run is unverified: this session cannot access the Docker engine, and the permission interface could not represent its named-pipe path. This is a local verification limitation separate from LinkedIn. The outstanding product-decision batch remains unanswered.
+Docker build/run is now verified (2026-10-13): 99 Linux container tests, non-root web/worker, volume restart persistence and image credential exclusion. Public hosting and remaining license acceptance are separate deployment work.
 
 ## Browser vertical slice (2026-10-05)
 
@@ -141,3 +142,15 @@ FR-1/7 runtime controls are verified with real browser Bluesky fetching: 5 fetch
 Implementation boundaries: `src/app_runtime.py` (worker/configuration), `src/polling.py` (status/count migration and force/cooldown), `src/console_ui.py` / `src/web_app.py` (protected console/controls), `src/dev_tools.py` (allowlisted jobs/explicit test publisher), `run_app.py` (single launch/local credential helper), `tests/test_operations.py` (acceptance/security). No Horizon code is used in these new components; existing provider/model/detection concepts remain referenced separately. Official Bluesky protocol documentation and X authentication mapping are recorded in design references.
 
 See [operations console](operations_console.md) for current run/setup instructions, acceptance evidence and X posting investigation. LinkedIn remains **⏸ EXTERNAL BLOCKER — API access pending**. No LinkedIn alternatives, keyword rules, fuzzy duplicate policy, source priority, production deployment, commit or push were introduced.
+
+
+## Integration milestone — 2026-10-13
+
+Current decisions supersede earlier conflicting draft ordering/notification notes. FR-6 uses Pin plus newest-first; manual numeric ordering is removed from the active UI and output. FR-7 Pin/unpin preserves the current admin view. FR-9 supplies a responsive horizontal approved-only News feed and matching iframe mock. REF-MSRG-NEWS is adopted as visual/insertion-point guidance from the public Hugo News template and user screenshot; no MSRG or Elfsight implementation copied.
+
+FR-8 Email implementation is verified with a persistent transactional outbox, no replay/backfill notifications, retry, Settings recipient/enable controls and environment-only SMTP credentials; SMS is 🔵 Deferred by explicit user decision. Real SMTP inbox delivery remains ⏸ External Blocker — deployment mail credentials/configuration pending; do not claim live email delivered. FR-10 integrated app Docker/Compose packaging is prepared; Docker engine build/run is verified; public deployment remains separate. Hosting URL and final MSRG installation remain deployment dependencies. See [website_integration.md](website_integration.md) and tests/test_notifications.py / tests/test_integration_ui.py.
+
+
+### Verified integration results (2026-10-13)
+
+99 tests pass locally and inside the Python 3.12 Linux Docker image. Docker image build, non-root UID 10001, isolated web/worker startup, approved-state volume persistence across restart, and exclusion of token files/local databases from `/app` verified. Compose configuration validation passed. Browser verified the News iframe, Pin retaining Published, notification opt-in/address save and SMS disabled. This supersedes earlier Docker-engine-unavailable notes: the user started the engine and build/run verification was completed. Final public hosting/install and real SMTP inbox receipt remain external configuration/deployment work. No emails sent to a real recipient; no commits/pushes.

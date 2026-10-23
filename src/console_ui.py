@@ -16,7 +16,7 @@ def stamp(value):
     return datetime.fromtimestamp(value,timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC') if value is not None else 'Never'
 
 
-def render_console(posts,history,settings,config,session,view,esc,card,runtime=None,devtools=None,notice='',query=None):
+def render_console(posts,history,settings,config,session,view,esc,card,runtime=None,devtools=None,notice='',query=None,notification_config=None,notification_state=None):
     query=query or {}
     csrf=session['csrf']
     def form(route,fields,label,disabled=False):
@@ -96,6 +96,10 @@ def render_console(posts,history,settings,config,session,view,esc,card,runtime=N
                 body+='<details '+('open' if run==runs[0] else '')+'><summary>'+badge(run['status'])+' '+esc(run['test_id'])+' · '+esc(stamp(run['started_at']))+' · %.2fs'%run['duration']+'</summary><pre>'+esc(run['output'] or 'Task running… refresh to see results.')+'</pre>'+link+'</details>'
             body+='</section>'
     elif view=='settings':
+        from .notifications import smtp_ready
+        notify=notification_config or dict(enabled=0,channel='email',recipient='')
+        state=notification_state or dict(pending=0,sent=0,error='')
+        body+='<section class="panel"><h2>Notifications</h2><form method="post" action="/notifications"><input type="hidden" name="csrf" value="'+csrf+'"><label><input type="checkbox" name="enabled" '+('checked' if notify['enabled'] else '')+'>Enable notifications</label><p><label>Via <select name="channel"><option value="email">Email</option><option value="sms" disabled>SMS — not available yet</option></select></label></p><p><label>Email address <input type="email" name="recipient" value="'+esc(notify['recipient'])+'" maxlength="254"></label></p><p><label><input type="checkbox" checked disabled>Notify me whenever a new post is queued for review</label></p><button>Save notifications</button></form><p>Mail transport: '+('Configured' if smtp_ready() else 'SMTP configuration required')+' · Pending: '+str(state['pending'])+' · Sent: '+str(state['sent'])+'</p><p><small>'+('Last delivery error: '+esc(state['error']) if state['error'] else 'SMTP credentials are supplied to the server through environment variables. Existing queued posts are not retroactively notified.')+'</small></p></section>'
         body+='<section class="panel"><h2>Feed appearance</h2><form method="post" action="/presentation"><input type="hidden" name="csrf" value="'+csrf+'"><label>Link color <input type="color" name="accent" value="'+esc(settings['accent'])+'"></label><label> Font size <input type="number" name="font_size" min="12" max="24" value="'+str(settings['font_size'])+'"></label><label><input type="checkbox" name="show_origin" '+('checked' if settings['show_origin'] else '')+'>Show source origin</label><button>Save appearance</button></form></section>'
     else:
         if view=='pending':
@@ -124,5 +128,5 @@ def render_console(posts,history,settings,config,session,view,esc,card,runtime=N
             title='Published' if view=='approved' else 'Rejected'
             chosen=[p for p in posts if p['editorial_status']==view]
             chosen.sort(key=lambda p:(p['created_at'] or '',p['platform'],p['post_id']),reverse=True)
-            body+='<h2>'+title+'</h2>'+(''.join(card(p,csrf) for p in chosen) or '<section class="panel">No posts in this view.</section>')
+            body+='<h2>'+title+'</h2>'+(''.join(card(p,csrf,return_view=view) for p in chosen) or '<section class="panel">No posts in this view.</section>')
     return body+'</main></div>'

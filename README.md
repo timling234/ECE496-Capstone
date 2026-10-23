@@ -290,3 +290,8 @@ Run `python run_app.py` from the repository root. Enter an admin password at the
 ## Current operational launch
 
 `python run_app.py` now starts both the admin/public web application and polling for enabled sources. Runtime configuration, Fetch Now and source status are under **Sources**; no separate polling terminal is needed. Default interval is 1800 seconds; existing saved intervals are preserved. For development, set `$env:ASAP_DEV_TOOLS='1'` before launching to enable the real test runner and live test tools. One-time Bluesky test-account setup uses `python run_app.py --configure-bluesky-test` (hidden app-password input, ignored local file). See [operations console](docs/operations_console.md). Older separate-worker instructions are historical/advanced CLI usage.
+
+
+## MSRG integration, Docker and Email
+
+See [website integration](docs/website_integration.md) for the exact Hugo News iframe insertion point, local preview, persistent Docker packaging and SMTP setup. Manual numeric ordering is retired; use Pin and newest-first. Email notifications are opt-in in Settings; SMS is deferred.

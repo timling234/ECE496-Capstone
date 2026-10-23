@@ -93,7 +93,9 @@ class EditorialWebTests(unittest.TestCase):
         self.assertEqual(publishable(self.conn),[])
         self.assertEqual(self.conn.execute('SELECT text FROM manual_versions').fetchone()[0],'Original announcement')
         decide(self.conn,'manual',identity,'approve');decide(self.conn,'x','C','approve')
-        set_order(self.conn,'x','C',1)
+        set_order(self.conn,'x','C',1) # Legacy saved values no longer control publication order.
+        self.assertEqual(publishable(self.conn)[0]['post_id'],identity)
+        decide(self.conn,'x','C','pin')
         self.assertEqual(publishable(self.conn)[0]['post_id'],'C')
         snapshot=self.conn.execute('SELECT * FROM posts ORDER BY platform,post_id').fetchall()
         save_presentation(self.conn,'#112233',20,False)

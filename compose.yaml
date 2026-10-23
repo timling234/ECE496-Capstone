@@ -1,0 +1,25 @@
+# FR-10: one app owns SQLite, polling, and notifications. No second worker.
+services:
+  asap:
+    build: .
+    ports:
+      - "127.0.0.1:5000:5000"
+    environment:
+      ASAP_ADMIN_PASSWORD: ${ASAP_ADMIN_PASSWORD:?Set ASAP_ADMIN_PASSWORD}
+      ASAP_DEV_TOOLS: "0"
+      ASAP_COOKIE_SECURE: ${ASAP_COOKIE_SECURE:-0}
+      ASAP_SMTP_HOST: ${ASAP_SMTP_HOST:-}
+      ASAP_SMTP_PORT: ${ASAP_SMTP_PORT:-587}
+      ASAP_SMTP_SECURITY: ${ASAP_SMTP_SECURITY:-starttls}
+      ASAP_SMTP_FROM: ${ASAP_SMTP_FROM:-}
+      ASAP_SMTP_USERNAME: ${ASAP_SMTP_USERNAME:-}
+      ASAP_SMTP_PASSWORD: ${ASAP_SMTP_PASSWORD:-}
+    volumes:
+      - asap-data:/data
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+volumes:
+  asap-data:

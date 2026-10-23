@@ -140,6 +140,11 @@ class AppRuntime:
                     try:self.fetch_now(platform)
                     finally:
                         with self.lock:self.pending.discard(platform)
-                if not self.stop_event.is_set():self.tick()
+                if not self.stop_event.is_set():
+                    self.tick()
+                    # FR-8: mail failures retry independently of provider ingestion.
+                    from .notifications import deliver_pending
+                    with closing(sqlite3.connect(self.db,timeout=15)) as conn:
+                        deliver_pending(conn)
             except Exception as error:self.error=type(error).__name__
             self.wake.wait(0.5);self.wake.clear()

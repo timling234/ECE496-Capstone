@@ -5,6 +5,7 @@ from contextlib import closing
 import hmac
 import html
 import json
+import os
 import secrets
 import sqlite3
 import time
@@ -14,6 +15,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 from .console_ui import render_console, STYLE
 from .dev_tools import DevTools
+from . import notifications
+from .feed_ui import feed_body, mock_body
 from .source_config import configure_source, find_source, identity
 from .web_editorial import initialize, items, decide, publishable, create_announcement, edit_announcement, set_order, presentation, save_presentation
 
@@ -32,7 +35,7 @@ def page(title,body,settings=None,console=False):
         '.content{white-space:pre-wrap;overflow-wrap:anywhere}small{color:#536579}img{max-width:100%;max-height:300px;border-radius:8px}a{color:#215e95}'
         +(STYLE if console else '')+'body{font-size:'+str(settings['font_size'])+'px}a{color:'+settings['accent']+'}</style></head><body>'+('' if console else '<h1>'+esc(title)+'</h1>')+body+'</body></html>').encode()
 
-def card(p,csrf=None,show_origin=True):
+def card(p,csrf=None,show_origin=True,return_view="pending"):
     status=p.get('editorial_status','approved' if not csrf else 'pending')
     label='PUBLISHED' if status=='approved' else 'REJECTED' if status=='rejected' else 'NEEDS REVIEW'
     body='<article data-platform="'+esc(p['platform'])+'" data-post-id="'+esc(p['post_id'])+'"><span class="post-status badge '+('good' if status=='approved' else 'bad' if status=='rejected' else 'warn')+'">'+label+'</span><small>'+(esc(p['platform'])+' · '+esc(p['account_id'])+' · ' if show_origin else '')+esc(p['created_at'] or 'Time unavailable')+'</small>'
@@ -55,17 +58,16 @@ def card(p,csrf=None,show_origin=True):
         for action in actions:
             label='Select & approve' if action=='approve' and p['group'] else action.capitalize()
             body+='<form method="post" action="/action">'
-            for name,value in [('csrf',csrf),('platform',p['platform']),('post_id',p['post_id']),('action',action)]:
+            for name,value in [('csrf',csrf),('platform',p['platform']),('post_id',p['post_id']),('action',action),('return_view',return_view)]:
                 body+='<input type="hidden" name="'+name+'" value="'+esc(value)+'">'
             body+='<button>'+label+'</button></form>'
-    if csrf and p['editorial_status']=='approved':
-        body+='<form method="post" action="/order"><input type="hidden" name="csrf" value="'+csrf+'"><input type="hidden" name="platform" value="'+esc(p['platform'])+'"><input type="hidden" name="post_id" value="'+esc(p['post_id'])+'"><label>Manual order (0 = default) <input type="number" name="position" min="0" max="100000" value="'+str(p['position'])+'"></label><button>Save order</button></form>'
     if csrf and p['platform']=='manual':
         body+='<details><summary>Edit announcement</summary><form method="post" action="/edit"><input type="hidden" name="csrf" value="'+csrf+'"><input type="hidden" name="post_id" value="'+esc(p['post_id'])+'"><textarea name="text" maxlength="10000" required>'+esc(p['text'])+'</textarea><button>Save edit (requires review)</button></form></details>'
     return body+'</article>'
 
 def make_server(db,password,host='127.0.0.1',port=5000,runtime=None,dev_enabled=False):
     sessions={}; attempts={}
+    cookie_secure='; Secure' if os.environ.get('ASAP_COOKIE_SECURE')=='1' else ''
     cookie_name="asap_session_"+str(port)
     devtools=DevTools(runtime,enabled=dev_enabled) if runtime else None
     config_path=runtime.config_path if runtime else Path(db).parent/'polling.local.json'
@@ -106,13 +108,13 @@ def make_server(db,password,host='127.0.0.1',port=5000,runtime=None,dev_enabled=
                 token=secrets.token_urlsafe(32)
                 sessions[token]={'csrf':secrets.token_urlsafe(32),'expires':time.time()+600,'authenticated':False}
                 return self.send(200,page('Admin sign in','<form method="post" action="/login"><input type="hidden" name="csrf" value="'+sessions[token]['csrf']+'"><label>Password <input type="password" name="password" required autocomplete="current-password"></label><button>Sign in</button></form>'),
-                    cookie_name+'='+token+'; HttpOnly; SameSite=Strict; Path=/; Max-Age=600')
+                    cookie_name+'='+token+cookie_secure+'; HttpOnly; SameSite=Strict; Path=/; Max-Age=600')
             if route=='/embed-demo':
-                return self.send(200,page('Mock MSRG Website','<p>Standalone website embedding the ASAP feed:</p><iframe title="ASAP feed" src="/feed" style="width:100%;height:650px;border:0"></iframe>'))
+                return self.send(200,page('Mock MSRG Website',mock_body()))
             if route=='/feed':
                 with closing(self.db_connection()) as conn:
                     posts=publishable(conn); settings=presentation(conn)
-                return self.send(200,page('MSRG / ASAP Feed','<p>Research updates</p>'+(''.join(card(p,show_origin=settings['show_origin']) for p in posts) or '<div class="panel">No published updates yet.</div>'),settings))
+                return self.send(200,page('MSRG / ASAP Feed',feed_body(posts,settings,esc,safe_url),settings))
             session=self.session()
             if not session or not session['authenticated']: return self.redirect('/login')
             if route!='/admin': return self.send(404,page('Not found',''))
@@ -122,9 +124,12 @@ def make_server(db,password,host='127.0.0.1',port=5000,runtime=None,dev_enabled=
             with closing(self.db_connection()) as conn:
                 posts=items(conn)
                 settings=presentation(conn)
+                notification_config=notifications.settings(conn)
+                notification_state=notifications.summary(conn)
+                conn.commit()
                 history=conn.execute('SELECT action,platform,post_id,actor,acted_at FROM editorial_actions ORDER BY id DESC LIMIT 20').fetchall()
             body=render_console(posts,history,settings,read_config(),session,view,esc,card,runtime,devtools,
-                query.get('notice',[''])[0],query=query)
+                query.get('notice',[''])[0],query=query,notification_config=notification_config,notification_state=notification_state)
             self.send(200,page('ASAP Admin',body,console=True))
         def do_POST(self):
             session=self.session()
@@ -143,11 +148,11 @@ def make_server(db,password,host='127.0.0.1',port=5000,runtime=None,dev_enabled=
                 token=secrets.token_urlsafe(32)
                 sessions[token]={'csrf':secrets.token_urlsafe(32),'expires':now+8*3600,'authenticated':True}
                 session['expires']=0
-                return self.redirect('/admin',cookie_name+'='+token+'; HttpOnly; SameSite=Strict; Path=/; Max-Age=28800')
+                return self.redirect('/admin',cookie_name+'='+token+cookie_secure+'; HttpOnly; SameSite=Strict; Path=/; Max-Age=28800')
             if not session['authenticated']:return self.send(403,page('Sign in required',''))
             if route=='/logout':
                 session['expires']=0
-                return self.redirect('/login',cookie_name+'=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0')
+                return self.redirect('/login',cookie_name+'='+cookie_secure+'; HttpOnly; SameSite=Strict; Path=/; Max-Age=0')
             if route in ('/fetch','/source-toggle','/dev-task'):
                 try:
                     if route=='/dev-task':
@@ -197,14 +202,22 @@ def make_server(db,password,host='127.0.0.1',port=5000,runtime=None,dev_enabled=
                         temporary.write_text(json.dumps(config,indent=2),encoding='utf-8');temporary.replace(config_path)
                 except ValueError as exc:return self.send(400,page('Invalid source configuration',esc(exc)))
                 return self.redirect('/admin?view=sources')
-            if route in ('/edit','/order','/presentation'):
+            if route=='/notifications':
+                try:
+                    with closing(self.db_connection()) as conn:
+                        notifications.save_settings(conn,bool(value('enabled')),value('channel'),value('recipient'))
+                except ValueError as exc:return self.send(400,page('Invalid notification settings',esc(exc)))
+                if runtime:runtime.wake.set()
+                return self.redirect('/admin?view=settings')
+            if route=='/order':return self.send(410,page('Manual order removed','Use Pin and newest-first ordering.'))
+            if route in ('/edit','/presentation'):
                 try:
                     with closing(self.db_connection()) as conn:
                         if route=='/edit':edit_announcement(conn,value('post_id'),value('text'))
                         elif route=='/order':set_order(conn,value('platform'),value('post_id'),value('position'))
                         else:save_presentation(conn,value('accent'),value('font_size'),bool(value('show_origin')))
                 except ValueError as exc:return self.send(400,page('Invalid change',esc(exc)))
-                return self.redirect('/admin')
+                return self.redirect('/admin?view=settings' if route=='/presentation' else '/admin?view=pending')
             if route=='/announcement':
                 try:
                     with closing(self.db_connection()) as conn:create_announcement(conn,value('text'))
@@ -214,7 +227,9 @@ def make_server(db,password,host='127.0.0.1',port=5000,runtime=None,dev_enabled=
             try:
                 with closing(self.db_connection()) as conn:decide(conn,value('platform'),value('post_id'),value('action'))
             except ValueError as exc:return self.send(400,page('Action unavailable',esc(exc)))
-            self.redirect('/admin?view=pending')
+            destination=value('return_view') if value('action') in ('pin','unpin') else 'pending'
+            if destination not in ('approved','pending','rejected'):destination='approved'
+            self.redirect('/admin?view='+destination)
     server=ThreadingHTTPServer((host,port),Handler)
     cookie_name="asap_session_"+str(server.server_port)
     server.runtime=runtime;server.devtools=devtools
