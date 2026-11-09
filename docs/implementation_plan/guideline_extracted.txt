@@ -1,0 +1,316 @@
+PAGE 1
+ECE496, Implementation Plan Guidelines, ©HST  Page 1 of 7 
+IMPLEMENTATION  PLAN  GUIDELINES     
+ 
+1. Introduction 
+These guidelines outline the expectations for preparing the Implementation Plan for your ECE496 
+capstone design project. You have already submitted a Proposal, which, much like in industry, 
+serves as the document a client or sponsor reviews before approving a project. While the Proposal 
+defines what the project is intended to achieve in terms of functionality, performance, and System 
+Requirements Specification (SyRS), the Implementation Plan focuses on how the proposed 
+solution will be designed, implemented, and verified. 
+The Implementation Plan should demonstrate that your team has progressed from a proposed 
+concept to a feasible engineering design that can be implemented and tested. It should provide a 
+clear technical path for moving the project from concept to realization. 
+ 
+ 
+2. The Implementation Plan 
+The Implementation Plan presents the technical design of your proposed solution and explains how 
+it will be implemented and verified. It should demonstrate the development of your project from 
+the initial concept presented in the Proposal toward a detailed engineering design. Specifically, it 
+should include: 
+• System Block Diagram: An enhanced and more detailed version of the diagram presented 
+in your Proposal. It should show the major functional modules and sub -blocks, with each 
+clearly labeled according to its function. Connections between modules should identify 
+their interfaces and, where appropriate, the flow of signals, data, or power. 
+• Alternative Approaches: A discussion of three feasible design approaches, including the 
+approach selected for implementation. Compare the approaches at the system level, discuss 
+the important trade-offs, and justify why the selected approach is the most appropriate for 
+meeting the project goals and requirements. 
+• Detailed Requirements:  A refined and updated System Requirements Specification 
+(SyRS) that incorporates feedback from the Proposal and any approved changes, while 
+remaining consistent with the project goals and the selected design approach. 
+• Verification Plan: A description of how each system requirement will be verified. The 
+plan should identify the appropriate verification methods and define measurable 
+acceptance criteria for determining whether each requirement has been satisfied. 
+ 
+ 
+3. List of Sections 
+The Implementation Plan should include the following sections. Consult your supervisor regarding 
+any additional sections or information that may be required for your project. 
+Cover Page (One page) 
+Include the project title, section number, team members' names, supervisor's name, administrator's 
+name, and date. 
+I. Summary of Project Status and Changes (Max one page) 
+Provide a concise update on the project since the Proposal, including progress made and any 
+significant changes in scope, requirements, or design approach. 
+II. Possible Solutions and Design Alternatives (Max three pages) 
+Describe three feasible design approaches, including the approach selected for implementation. 
+Compare the approaches at the system level, discuss the important trade-offs, and justify why the 
+selected approach is the most appropriate for meeting the project goals and requirements. 
+
+PAGE 2
+ECE496, Implementation Plan Guidelines, ©HST  Page 2 of 7 
+III. Technical Design and Implementation (Max four pages) 
+Provide the technical details of your selected design, including: 
+• System-Level Overview: A brief explanation of the overall design and its principle of 
+operation. 
+• System Block Diagram: An expanded and more detailed version of the diagram presented 
+in the Proposal. 
+• Module Descriptions: A description of the func tion of each major module or sub -block, 
+including its inputs, outputs, and interfaces with other modules. 
+IV. Test and Verification (Max two pages) 
+Explain how the design will be tested and verified, including: 
+• Verification Table:  Link each system requirem ent to its verification method, such as 
+testing or analysis, and provide measurable acceptance criteria for determining whether the 
+requirement has been satisfied. 
+V. Appendices 
+The appendices are not subject to the page limits specified above. The followi ng appendices are 
+required: 
+Appendix A: System Requirements Specification (SyRS) 
+Appendix B: Gantt Chart 
+Appendix C: Financial Plan – Budget Table 
+Additional appendices may be included as needed to provide supporting information, data, graphs, 
+tables, or other material relevant to the project. 
+ 
+Page Limits: The page limits specified above apply to the main sections of the Implementation 
+Plan, including figures and tables. The cover page, references, and appendices are excluded from 
+these limits. References should be provided in a separate section following Section IV and before 
+the appendices. 
+ 
+ 
+4. Descriptions of Document Sections 
+I. Summary of Project Status and Changes 
+This section provides a brief overview of your project's current status and progress since 
+submitting the Proposal. It should address the following points: 
+• Implementation Progress:  Summarize the technical work completed so far, including 
+design decisions, simulations, prototyping, and implementation activities. Identify any 
+modules or components that have been partially or fully implemented and indicate what is 
+currently functional. 
+• Challenges Encountered:  Describe any significant technical or implementation 
+challenges encountered since submitting the Proposal and explain how you have addressed 
+or plan to address them. 
+• Plans Ahead: Outline the major tasks remaining and your plans for completing them in 
+the coming weeks. 
+In addition, describe any significant changes made to the project since the Proposal, including 
+changes to the Project Goal, System Requirements, design approach, or Risk Assessment. Provide 
+a brief justification for each change. Significant changes must be reviewed and approved by your 
+supervisor. 
+ 
+
+PAGE 3
+ECE496, Implementation Plan Guidelines, ©HST  Page 3 of 7 
+II. Possible Solutions and Design Alternatives 
+Describe three feasible design approaches considered by your team, including the approac h 
+selected for implementation. The alternatives should represent meaningful system -level design 
+choices rather than minor differences in coding, implementation details, or individual components. 
+Compare the three approaches based on criteria relevant to yo ur project, such as performance, 
+complexity, cost, reliability, implementation effort, available resources, and ability to meet the 
+System Requirements. Discuss the advantages, limitations, and important trade -offs of each 
+approach. 
+Based on your comparison, justify why the selected approach is the most appropriate for meeting 
+the project goals and requirements. Where appropriate, use a comparison table to summarize the 
+alternatives and their trade-offs. 
+ 
+III. Technical Design and Implementation 
+This section des cribes the technical design of your selected solution and how it will be 
+implemented. Break down the overall system into smaller functional modules or sub -blocks and 
+explain how they work together. Include the following: 
+• System-Level Overview:  Summarize th e overall design and describe its principle of 
+operation, key algorithms, or process flow, as applicable. Explain the main technical 
+approach and indicate whether it is based on established methods, modifications of existing 
+designs, or new ideas. Where applicable, cite relevant references. 
+• System Block Diagram:  Present an enhanced and more detailed version of the System 
+Block Diagram provided in the Proposal. The diagram should identify the major functional 
+modules and sub-blocks, their interconnections, a nd how they interact within the overall 
+system. Clearly label the modules and relevant connections, including the flow of data, 
+signals, or power, where applicable. Figures 1 and 2  provide examples of different System 
+Block Diagrams. 
+• Module Descriptions: Describe the function of each major module or sub-block shown in 
+the System Block Diagram. Identify its important inputs and outputs, explain how it 
+operates, and describe its interfaces with other modules. Where applicable, provide 
+relevant technical details such as signals, data formats, communication protocols, voltage 
+or current levels, mechanical interfaces, or APIs. Include important module -level 
+specifications that affect the system's ability to meet its overall requirements. 
+The level of detail should be sufficient to demonstrate that the major technical design decisions 
+have been made and that the team has a clear plan for implementation, integration, and testing. 
+ 
+ 
+Figure 1: Example of a System Block Diagram for a software-based system. 
+ 
+
+
+PAGE 4
+ECE496, Implementation Plan Guidelines, ©HST  Page 4 of 7 
+ 
+Figure 2: Example of a System Block Diagram for a hardware-based system. 
+ 
+For each major module or sub -block in your System Block Diagram, provide a brief description 
+of its function, inputs, outputs, and interfaces with other modules. Include relevant technical 
+specifications, particularly those that affect the system's ability  to meet its overall requirements. 
+The following example, based on the Program Counter (PC) Stack module in Figure 2, illustrates 
+the expected format. 
+ 
+Program Counter (PC) Stack Module Example from Figure 2: 
+Program Counter (PC) Stack 
+Inputs:  
+• Low 16 bits of Instruction Register  
+• 4-bit Stack Pointer 
+• Branch Flag 
+Output: 16-bit Program Counter Next Address 
+Function: The Program Counter Stack is configured as a 16-level last-in, first-out (LIFO) stack. 
+It supports eight levels, with two locations allocated to each level. One location stores the return 
+address for subroutine calls, while the other supports instruction branching within the current 
+level. 
+ 
+ 
+IV. Test and Verification  
+Describe the testing and evaluation completed so far, and explain how you plan to verify that the 
+final system meets its System Requirements (SyRS). Consider what evidence would convince a 
+client—or the audience at the Design Fair—that your system performs as intended. 
+Include the following, where applicable: 
+• Verification Methods and Setups: Describe the methods and procedures used or planned 
+for verification, including required equipment, diagnostic software, test setups, or special 
+arrangements. 
+• Sample Si zes and Test Conditions:  Specify the number of trials or samples, where 
+applicable, and the operating conditions under which the tests will be performed. 
+
+
+PAGE 5
+ECE496, Implementation Plan Guidelines, ©HST  Page 5 of 7 
+• Acceptance Criteria:  Define measurable success criteria (pass/fail conditions) for 
+determining whether each system requirement has been satisfied. 
+Clearly distinguish between tests already completed and those planned for later stages of the 
+project. Each verification activity should provide evidence that the system meets its specified 
+requirements. 
+ 
+Verification Table 
+Provide a Verification Table that lists each System Requirement using the same requirement ID 
+assigned in your SyRS. For each requirement, identify the verification method, briefly describe 
+how verification will be performed, and specify measurable acceptance criteria. 
+Possible verification methods include: 
+• TEST: Direct measurement or testing of the system's performance under specified 
+conditions. This is the most common verification method. 
+• ANALYSIS: Use of mathematical calculations, sim ulations, or engineering analysis to 
+demonstrate compliance with a requirement. 
+• REVIEW OF DESIGN: Examination of design documents, specifications, drawings, or 
+component information to confirm that a requirement has been satisfied. 
+• SIMILARITY: Demonstration of compliance based on an existing design or component 
+with sufficiently similar characteristics and previously verified performance. This method 
+should be used only when the similarity can be justified and supported by evidence. 
+Table 1 provides examples of how system requirements can be linked to verification methods and 
+acceptance criteria. 
+ 
+Table 1: Example verification table. 
+ID System Requirement Verification Method and 
+Procedure Acceptance Criteria 
+1.0 
+Output voltage: 10.0 ± 0.2 
+V; maximum output 
+current: 10 A 
+TEST: Connect a range of load 
+resistors and measure output voltage 
+and current. 
+Output voltage remains 
+between 9.8 V and 10.2 V 
+over the specified load 
+range, up to 10 A. 
+2.0 Weight: Maximum 2 kg TEST: Measure total system weight 
+using a calibrated scale. Total weight ≤ 2 kg. 
+3.0 Dimensions: Maximum 10 
+× 10 × 2 cm 
+TEST: Measure the system 
+dimensions using calipers. 
+Each dimension is within 
+its specified maximum. 
+4.0 
+Light modulation  depth: 
+50% ± 5 percentage points 
+over 0.1 Hz–50 kHz 
+TEST: Apply a 1 V peak -to-peak 
+reference signal over the specified 
+frequency range. Measure 
+modulation depth using a 
+photodetector and oscilloscope.  
+Measured m odulation 
+depth remains between 
+45% and 55% across the 
+specified frequency range. 
+5.0 Total pow er consumption 
+≤ 100 W (16 channels) 
+TEST + ANALYSIS: Measure the 
+power consumption of a 
+representative channel and estimate 
+total consumption for 16 channels, 
+accounting for shared system 
+components. 
+Calculated total power 
+consumption ≤ 100 W. 
+Note: These examples are illustrative. Actual verification procedures and acceptance criteria must 
+reflect the project requirements. 
+ 
+
+PAGE 6
+ECE496, Implementation Plan Guidelines, ©HST  Page 6 of 7 
+V. Required Appendices  
+The following appendices are required. Additional appendices may be included as needed to 
+provide supporting information relevant to the project. 
+ 
+Appendix A: System Requirements Specification (SyRS) 
+Provide a complete and updated System Requirements Specification (SyRS), incorporating the 
+feedback received on your Proposal and any changes resulting fr om the detailed design. Ensure 
+that the requirements are clear, measurable, and verifiable, and remain consistent with the project's 
+goals and selected design approach. 
+ 
+Appendix B: Gantt Chart 
+Provide an updated version of the Gantt chart submitted with y our Proposal. The chart should 
+reflect the project's current progress and remaining activities, clearly indicating task durations, 
+dependencies, milestones, and team member responsibilities. 
+ 
+Appendix C: Financial Plan 
+Provide a complete budget for your pr oject, including parts, hardware, software licenses, rentals, 
+services, and labor costs (based on an assumed hourly rate for team members). The Financial Plan 
+must include a budget table and contingency arrangements in case funding is delayed, reduced, or 
+unavailable. 
+The budget should distinguish between the total estimated project cost and the actual funding 
+required. Include the estimated cost of student labor to reflect the overall project cost, but do not 
+include student labor in the amount requested from the course. Items provided at no cost through 
+the course should be listed with an actual cost of $0. Where applicable, their estimated commercial 
+value may be indicated separately. 
+ 
+Budget Preparation Rules: 
+1. Each student is expected to cover  the first $100 of project expenses  before requesting 
+additional funding. Supervisors may also provide financial support, and limited 
+departmental funding may be available. Since approved funds may be released later in the 
+project, include contingency arrangements in case funding is delayed or reduced. 
+2. Clearly distinguish between equipment, shared items, and contractor or service costs  
+in the budget table. 
+3. Identify contributions from team members, supervisors, or other sources and subtract these 
+amounts from the eligible project expenses to determine the funding requested from the 
+course. Student labor costs and items provided at no cost should not be included in the 
+funding request. 
+4. Identify any items that team members intend to keep at the end of the course. 
+5. Estimate labor costs based on the tasks and time allocations in your Gantt chart, using an 
+assumed hourly rate rather than an overall estimate of hours. 
+6. Identify high-priority items  and describe contingency arrangements if funding is not 
+available. For example: 
+Priority 1 – GPS Receiver: If funding is not obtained, we will simulate GPS signals and 
+adjust the Technical Solution, Work Plan, and Financial Plan accordingly. 
+Notes: 
+• Use a budget format similar to the sample Tables 2 and 3. 
+• The process for requesting funding from the Design Centre is separate from the preparation 
+and submission of this report. 
+Good luck! 
+
+PAGE 7
+ECE496, Implementation Plan Guidelines, ©HST  Page 7 of 7 
+Table 2: Sample Budget for a software project. 
+ 
+ 
+ 
+Table 3: Sample Budget for a hardware project. 
+ 
+ 
+Note: The following sample budgets illustrate how to document project expenses, student labor, 
+and funding contributions. Student labor is included in the estimated total project cost but excluded 
+from the funding requested from ECE496. 

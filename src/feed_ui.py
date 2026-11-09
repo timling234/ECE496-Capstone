@@ -10,7 +10,8 @@ def feed_body(posts,settings,esc,safe_url):
     cards=[]
     for p in posts:
         label='MSRG announcement' if p['platform']=='manual' else 'Middleware Systems Research Group'
-        body='<article class="news-card"><div class="news-head"><span>'+label+'</span>'+('<span class="platform">'+esc(p['platform'])+'</span>' if settings['show_origin'] else '')+'</div><time class="news-date">'+esc((p['created_at'] or '')[:10] or 'Date unavailable')+'</time>'
+        if p['platform']=='linkedin':label=p.get('metadata',{}).get('source_label') or 'LinkedIn Page '+str(p['account_id'])
+        body='<article class="news-card" data-platform="'+esc(p['platform'])+'" data-post-id="'+esc(p['post_id'])+'"><div class="news-head"><span>'+esc(label)+'</span>'+('<span class="platform">'+esc(p['platform'])+'</span>' if settings['show_origin'] else '')+'</div><time class="news-date">'+esc((p['created_at'] or '')[:10] or 'Date unavailable')+'</time>'
         for media in p['media'][:1]:
             url=safe_url(media.get('fullsize') or media.get('url') or media.get('preview_image_url'))
             if url:body+='<img loading="lazy" referrerpolicy="no-referrer" src="'+esc(url)+'" alt="'+esc(media.get('alt','Post image'))+'">'

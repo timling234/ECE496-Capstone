@@ -52,7 +52,7 @@ Current work includes:
 - X official API POC passed
 - Bluesky public-read POC passed
 - LinkedIn API path investigated
-- LinkedIn testing currently requires Business Account Authentication
+- LinkedIn organization Page ingestion and OAuth connection flow implemented; server app configuration required
 
 **September 16 - Feasibility Review**
 - Initial API feasibility presented to Michalis
@@ -124,7 +124,7 @@ The architecture separates provider-specific retrieval from the common ASAP proc
 | Detailed Requirements | ✓ Received |
 | X API POC | ✓ Passed |
 | Bluesky Public-read POC | ✓ Passed |
-| LinkedIn API Investigation | ⚠ Business Account Authentication Needed |
+| LinkedIn organization API | OAuth/Page selection and organization ingestion implemented; live smoke succeeded; integrated callback requires server configuration |
 | Existing-Solution Research | ● In Progress |
 | Proposal Meeting Preparation | ● In Progress |
 | Formal Project Proposal | ● In Progress |
@@ -190,7 +190,7 @@ JAN                    FEB                    MAR
 - Complete Proposal Meeting presentation
 - Complete formal Project Proposal
 - Complete existing-solution comparison
-- Continue LinkedIn Business Account Authentication investigation
+- Configure the LinkedIn callback and connect authorized organization Pages (see docs/linkedin_integration.md)
 - Refine initial ASAP architecture
 - Prepare for implementation following proposal feedback
 
@@ -212,7 +212,7 @@ returns a nonzero exit code on failure. The demo menu shows FR-1–5 behavior.
 Choose **6** for all safe offline demos, including simulated ingestion and
 offline replay: no APIs, credentials, real Store writes or cursor changes.
 Choose **1** for explicitly confirmed live X/Bluesky ingestion; it reports
-counts and uses a temporary database. LinkedIn is pending and no scheduler exists.
+counts and uses a temporary database. See the current operational launch below for the app-owned scheduler and LinkedIn integration.
 See [manual verification guide](docs/manual_sanity.md) for expected results,
 inspection steps, and a session-only Python alias if your PATH lacks `python`.
 
@@ -229,7 +229,7 @@ durable checkpoints, interval/restart handling and independent source failures.
 no requests or database changes. Live scheduling requires enabled sources,
 explicit intervals and `--live`; no production frequency is selected for you.
 See [polling and Docker packaging](docs/polling_and_deployment.md).
-LinkedIn remains planned: **API access pending**; policy review is separate.
+LinkedIn Community Management Development access is approved. Organization OAuth and organization ingestion are implemented; public-feed use remains a separate restriction.
 
 ## X and Bluesky Store proof of concept
 
@@ -295,3 +295,13 @@ Run `python run_app.py` from the repository root. Enter an admin password at the
 ## MSRG integration, Docker and Email
 
 See [website integration](docs/website_integration.md) for the exact Hugo News iframe insertion point, local preview, persistent Docker packaging and SMTP setup. Manual numeric ordering is retired; use Pin and newest-first. Email notifications are opt-in in Settings; SMS is deferred.
+
+
+## LinkedIn organization Pages (2026-11-07)
+
+Sources -> + Add Source -> LinkedIn -> Authenticate -> approve -> load/select a Page -> Fetch Now. New connections default to manual pulls. Server credentials and the registered callback require one-time setup with `python run_app.py --configure-linkedin` or environment variables. See [LinkedIn setup, flow and quota boundaries](docs/linkedin_integration.md). Every pull reads one recent page only; personal posts are unsupported and LinkedIn posts follow the same manual approval and local Feed flow as other sources.
+
+
+## Jarvis deployment and next-stage handoff
+
+See [Jarvis handoff](docs/JARVIS_HANDOFF.md) for the current beta branch, clean-clone Docker startup, domain/HTTPS and SMTP milestones, then portal/authentication, LLM moderation and Thomas website integration. Clone does not include local credentials or existing data.

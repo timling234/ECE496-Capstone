@@ -24,6 +24,7 @@ TESTS={
  'editorial':('Editorial Workflow','FR-6/7','test_editorial.py'),
  'web':('Admin / Public Renderer','FR-6/7/9/11','test_web_app.py'),
  'polling':('Provider / Scheduler','FR-1','test_polling.py'),
+ 'linkedin':('LinkedIn OAuth / Ingestion / Feed','FR-1/2/3/7/9','test_linkedin.py'),
  'operations':('Operations / Dev Tools','FR-1/7/10','test_operations.py'),
  'entrypoints':('Verification Entry Points','FR-10','test_verification_entrypoints.py'),
 }

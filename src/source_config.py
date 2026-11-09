@@ -23,8 +23,12 @@ def configure_source(config, fields, key=None):
     if not 1<=interval<=31536000:raise ValueError('Interval must be 1–31536000 seconds')
     page_size=int(fields.get('page_size') or (existing or {}).get('page_size',5))
     if platform=='linkedin':
-        if enabled:raise ValueError('LinkedIn API access pending; keep it disabled')
-        page_size=None
+        if not existing or not existing.get('connection_id'):
+            raise ValueError('Use Connect LinkedIn to add an authorized Page')
+        if account != existing.get('account'):
+            raise ValueError('Connect another LinkedIn Page to change the organization')
+        if interval < 1800:raise ValueError('LinkedIn polling must be at least 1800 seconds')
+        if not 1 <= page_size <= 100:raise ValueError('LinkedIn page size must be 1–100')
     elif platform=='x':XProvider(account,page_size=page_size)
     else:BlueskyProvider(account,page_size=page_size)
     replacement=dict(existing or {})

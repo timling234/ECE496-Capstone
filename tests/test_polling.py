@@ -230,7 +230,7 @@ class PollingConfigTests(unittest.TestCase):
             with redirect_stdout(io.StringIO()) as output:
                 self.assertEqual(run_polling.main(["--once", "--db", str(path)]), 0)
             self.assertFalse(path.exists())
-            self.assertIn("LinkedIn API access pending", output.getvalue())
+            self.assertIn("No API requests or Store changes", output.getvalue())
 
     def test_enabled_linkedin_is_not_a_fake_adapter(self):
         """Verifies FR-1: LinkedIn cannot be marked working without external access."""

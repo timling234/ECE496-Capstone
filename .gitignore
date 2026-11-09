@@ -12,8 +12,10 @@ x_last_seen_id.txt.tmp
 *token*.txt
 .env
 .env.*
+!.env.example
 secrets/
 credentials/
+linkedin_credentials/
 
 
 # ==================================================

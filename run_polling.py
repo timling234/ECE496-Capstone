@@ -10,6 +10,7 @@ from pathlib import Path
 from src.polling import PollingSource, poll_due
 from src.providers import BlueskyProvider, XProvider
 from src.store_poc import ROOT, X_TOKEN
+from src.linkedin import Credentials, LinkedInProvider
 
 
 # FR-1/FR-10: File configuration and executable scheduler; no default frequency
@@ -20,8 +21,14 @@ def load_sources(path):
         platform = item["platform"]
         enabled = item.get("enabled", False)
         if platform == "linkedin":
-            if enabled:
-                raise ValueError("LinkedIn API access pending; cannot enable it")
+            if not item.get("account") or not item.get("connection_id"):
+                if enabled: raise ValueError("Connect a LinkedIn Page before enabling it")
+                continue
+            if enabled and (type(item.get("interval_seconds")) not in (int, float) or item["interval_seconds"] < 1800):
+                raise ValueError("LinkedIn polling must be at least 1800 seconds")
+            provider = LinkedInProvider(item["account"], item["connection_id"],
+                Credentials(path.parent / "linkedin_credentials"), page_size=item.get("page_size", 100), label=item.get("label"))
+            sources.append(PollingSource(provider, item.get("interval_seconds"), enabled))
             continue
         if platform == "x":
             token_path = Path(item.get("token_file", str(X_TOKEN)))
@@ -46,7 +53,7 @@ def main(argv=None):
     try:
         sources = load_sources(args.config)
         if not any(source.enabled for source in sources):
-            print("No enabled sources. LinkedIn API access pending. No API requests or Store changes.")
+            print("No enabled sources. Connect LinkedIn from Sources when needed. No API requests or Store changes.")
             return 0
         if not args.live:
             print("Live sources configured: add --live to permit API requests. No requests made.")

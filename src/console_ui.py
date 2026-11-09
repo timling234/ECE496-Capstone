@@ -28,7 +28,7 @@ def render_console(posts,history,settings,config,session,view,esc,card,runtime=N
     body='<header><h1>ASAP Admin</h1><span>Operations console · '+form('/logout',{},'Sign out')+'</span></header><div class="layout"><aside>'+''.join('<a class="'+('active' if v==view else '')+'" href="/admin?view='+v+'">'+label+'</a>' for v,label in navigation)+'<a href="/feed" target="_blank">Public Feed ↗</a><a href="/embed-demo" target="_blank">Embedding Preview ↗</a></aside><main>'
     body+='<p><a href="/admin?view='+esc(view)+'">Refresh status / results</a></p>'
     if notice:body+='<div class="notice">'+esc(notice)+'</div>'
-    sources=runtime.snapshot() if runtime else [dict(s,status='Pending Access' if s['platform']=='linkedin' else 'Disabled') for s in config['sources']]
+    sources=runtime.snapshot() if runtime else [dict(s,status=('Disabled' if s.get('connection_id') else 'Not connected') if s['platform']=='linkedin' else 'Disabled') for s in config['sources']]
     counts={'Pending':sum(p['editorial_status'] in ('pending','needs review') for p in posts),'Approved':sum(p['editorial_status']=='approved' for p in posts),'Rejected':sum(p['editorial_status']=='rejected' for p in posts),'Duplicate Groups':len({p['group'] for p in posts if p['group'] and p['editorial_status'] in ('pending','needs review')})}
     if view=='dashboard':
         body+='<div class="metrics">'+''.join('<div class="metric">'+key+'<strong>'+str(value)+'</strong></div>' for key,value in counts.items())+'</div><section class="panel"><h2>System health</h2><table><tbody>'
@@ -45,8 +45,9 @@ def render_console(posts,history,settings,config,session,view,esc,card,runtime=N
             friendly={401:'Credentials rejected',403:'API access denied',429:'Rate limited; wait until next due'}.get(code,
                 {'FileNotFoundError':'Local token file missing','URLError':'Network connection failed','TimeoutError':'Provider request timed out','ValueError':'Invalid provider/configuration response'}.get(s.get('error_type'),''))
             if friendly:error+=' · '+friendly
-            actions='' if platform=='linkedin' else form('/fetch',{'source_key':key},'Fetch Now')+form('/source-toggle',{'source_key':key},'Disable' if s.get('enabled') else 'Enable')
-            body+='<tr><td><a aria-label="Edit '+esc(platform)+' '+esc(s.get('account',''))+'" href="/admin?view=sources&amp;edit_source='+quote(key,safe='')+'">✎</a> <b>'+esc(platform)+'</b><br><small>'+esc(s.get('account','API access pending'))+'</small></td><td>'+badge(s['status'])+'</td><td>'+('Enabled' if s.get('enabled') else 'Disabled')+'<br>'+esc(s.get('interval_seconds') or 1800)+' sec</td><td>'+esc(stamp(s.get('last_attempt_at')))+'<br><small>Success: '+esc(stamp(s.get('last_success_at')))+'</small></td><td>'+str(s.get('fetched_count',0))+' fetched / '+str(s.get('new_count',0))+' new</td><td>'+esc(error)+'<br><small>'+esc(stamp(s.get('next_poll_at')) if s.get('next_poll_at') else '—')+'</small></td><td>'+actions+'</td></tr>'
+            actions=(form('/fetch',{'source_key':key},'Fetch Now')+form('/source-toggle',{'source_key':key},'Disable' if s.get('enabled') else 'Enable')) if platform!='linkedin' or s.get('connection_id') else ''
+            if platform=='linkedin':actions+=form('/linkedin/connect',{},'Authenticate')
+            body+='<tr><td><a aria-label="Edit '+esc(platform)+' '+esc(s.get('account',''))+'" href="/admin?view=sources&amp;edit_source='+quote(key,safe='')+'">✎</a> <b>'+esc(platform)+'</b><br><small>'+esc(s.get('label') or s.get('account') or 'Connect a Page')+'</small></td><td>'+badge(s['status'])+'</td><td>'+('Enabled' if s.get('enabled') else 'Disabled')+'<br>'+esc(s.get('interval_seconds') or 1800)+' sec</td><td>'+esc(stamp(s.get('last_attempt_at')))+'<br><small>Success: '+esc(stamp(s.get('last_success_at')))+'</small></td><td>'+str(s.get('fetched_count',0))+' fetched / '+str(s.get('new_count',0))+' new</td><td>'+esc(error)+'<br><small>'+esc(stamp(s.get('next_poll_at')) if s.get('next_poll_at') else '—')+'</small></td><td>'+actions+'</td></tr>'
         body+='</table></div></section>'
         edit_key=query.get('edit_source',[''])[0]
         adding=query.get('source_form',[''])[0]=='add'
@@ -62,12 +63,17 @@ def render_console(posts,history,settings,config,session,view,esc,card,runtime=N
                 if adding:
                     body+='<form method="get" action="/admin"><input type="hidden" name="view" value="sources"><input type="hidden" name="source_form" value="add"><label>Provider <select name="provider" aria-label="Provider">'+''.join('<option value="'+v+'" '+('selected' if v==platform else '')+'>'+label+'</option>' for v,label in [('bluesky','Bluesky'),('x','X'),('linkedin','LinkedIn')])+'</select></label><button>Choose provider</button></form>'
                 else:body+='<p>Provider: <b>'+esc(platform)+'</b></p>'
+                if platform=='linkedin':
+                    body+='<p>Connect the LinkedIn account that administers your organization Page. Personal post retrieval is not supported. Authenticate on LinkedIn, approve access, then choose the Page to fetch from.</p>'+form('/linkedin/connect',{},'Authenticate')
+                    if not source.get('connection_id'):
+                        body+='</section></main></div>'
+                        return body
                 body+='<form method="post" action="/source-save"><input type="hidden" name="csrf" value="'+csrf+'"><input type="hidden" name="provider" value="'+platform+'"><input type="hidden" name="source_key" value="'+esc(edit_key)+'">'
-                label='Account / Handle' if platform=='bluesky' else 'Account / User ID' if platform=='x' else 'Account reference (optional; access pending)'
-                body+='<label>'+label+' <input type="text" name="account" value="'+esc(source.get('account'))+'" '+('required' if platform!='linkedin' else '')+'></label><label>Polling interval <input type="number" name="interval_seconds" min="1" max="31536000" value="'+str(source.get('interval_seconds') or 1800)+'"> seconds</label>'
-                body+='<label><input type="checkbox" name="enabled" '+('checked' if source.get('enabled') else '')+' '+('disabled' if platform=='linkedin' else '')+'>Enabled</label>'
-                if platform!='linkedin':body+='<label>'+('X page size (5–100)' if platform=='x' else 'Bluesky page size (1–100)')+' <input type="number" name="page_size" min="'+('5' if platform=='x' else '1')+'" max="100" value="'+str(source.get('page_size',5))+'"></label>'
-                body+='<p><small>'+('X uses its existing local token reference; credentials are not sent to the browser.' if platform=='x' else 'LinkedIn API access is pending; this source remains disabled.' if platform=='linkedin' else 'Public author-feed retrieval; no posting credentials are inferred from this source.')+'</small></p><a href="/admin?view=sources">Cancel</a> <button>'+('Save Source' if edit_key else 'Add Source')+'</button></form></section>'
+                label='Account / Handle' if platform=='bluesky' else 'Account / User ID' if platform=='x' else 'Organization ID'
+                body+='<label>'+label+' <input type="text" name="account" value="'+esc(source.get('account'))+'" '+('required' if platform!='linkedin' else 'readonly')+'></label><label>Polling interval <input type="number" name="interval_seconds" min="'+('1800' if platform=='linkedin' else '1')+'" max="31536000" value="'+str(source.get('interval_seconds') or 1800)+'"> seconds</label>'
+                body+='<label><input type="checkbox" name="enabled" '+('checked' if source.get('enabled') else '')+' '+''+'>Enabled</label>'
+                body+='<label>'+('X page size (5–100)' if platform=='x' else 'LinkedIn page size (1–100)' if platform=='linkedin' else 'Bluesky page size (1–100)')+' <input type="number" name="page_size" min="'+('5' if platform=='x' else '1')+'" max="100" value="'+str(source.get('page_size',5))+'"></label>'
+                body+='<p><small>'+('X uses its existing local token reference; credentials are not sent to the browser.' if platform=='x' else 'LinkedIn pulls one recent page per fetch. Automatic polling is optional (minimum 30 minutes). LinkedIn posts use the same manual approval flow as other sources.' if platform=='linkedin' else 'Public author-feed retrieval; no posting credentials are inferred from this source.')+'</small></p><a href="/admin?view=sources">Cancel</a> <button>'+('Save Source' if edit_key else 'Add Source')+'</button></form></section>'
     elif view=='testing':
         if not devtools or not devtools.enabled:body+='<section class="panel"><h2>Development tools disabled</h2><p>Enable locally with ASAP_DEV_TOOLS=1. Production default is disabled.</p></section>'
         else:
