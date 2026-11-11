@@ -21,6 +21,7 @@ from .google_login import GoogleLogin
 from .linkedin import Credentials, OAuth
 from .web_app import make_handler, page, esc
 from .workspaces import Workspace, Workspaces
+from .portal_ui import auth_page
 
 COOKIE = 'asap_portal'
 
@@ -113,13 +114,18 @@ def create_app(db, password, runtime=None, *, start_workers=False, google=None, 
     def unavailable(error):
         return document('Request unavailable', '<p>Refresh the page and try again. If requests are limited, wait a minute.</p>', error.code)
 
+    def account_gateway(register=False, error=''):
+        session=anonymous()
+        return Response(auth_page(register=register,google_ready=google.ready,
+                                  csrf=session['csrf'],error=error,
+                                  email=request.form.get('email','') if request.method=='POST' else ''),
+                        content_type='text/html; charset=utf-8')
+
     @app.get('/')
     def home():
-        return document('ASAP — A Simple Aggregation Platform',
-            '<section class="panel"><h2>Your sources. One reviewed feed.</h2><p>Bring organization posts and announcements together, review them, and embed your approved news on a website.</p>'
-            '<p><a href="/register">Create your workspace</a> · <a href="/signin">Sign in</a></p></section>'
-            '<section class="panel"><h2>Review before publishing</h2><p>Connect sources, approve the posts you want to share, and publish an embeddable feed. Each account has its own private review queue.</p>'
-            '<a href="/feed">View the original public feed</a></section>')
+        if g.user:
+            return redirect('/app',303)
+        return account_gateway()
 
     @app.route('/register', methods=['GET', 'POST'])
     @app.route('/signin', methods=['GET', 'POST'])
@@ -144,16 +150,8 @@ def create_app(db, password, runtime=None, *, start_workers=False, google=None, 
                         raise ValueError('Email or password is incorrect.')
                 return signed_in(user)
             except ValueError as exc:
-                error = '<p role="alert">' + esc(exc) + '</p>'
-        title = 'Create your ASAP account' if register else 'Sign in to ASAP'
-        form = error + '<section class="panel"><form method="post">' + csrf_field()
-        form += '<p><label>Email <input type="email" name="email" maxlength="254" autocomplete="email" required></label></p>'
-        form += '<p><label>Password <input type="password" name="password" ' + ('minlength="12" ' if register else '') + 'maxlength="256" autocomplete="' + ('new-password' if register else 'current-password') + '" required></label></p>'
-        if register:
-            form += '<p><label>Confirm password <input type="password" name="confirm_password" autocomplete="new-password" required></label></p><p><small>Use at least 12 characters. Email notifications require a verified Google account with the same email.</small></p>'
-        form += '<button>' + ('Create account' if register else 'Sign in') + '</button></form></section>'
-        form += '<p><a href="/auth/google">Continue with Google</a></p>' if google.ready else '<p><small>Google sign-in is awaiting administrator setup. Email and password sign-in is available.</small></p>'
-        return document(title, form)
+                error = str(exc)
+        return account_gateway(register=register,error=error)
 
     @app.get('/app')
     def dashboard():
