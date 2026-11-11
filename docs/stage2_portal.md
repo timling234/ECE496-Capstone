@@ -109,3 +109,13 @@ Tests must cover two simultaneous users, cross-account forged post IDs, isolated
 settings/sources/grants, approved-only public feeds, CSRF, cookie/session rotation,
 logout and restart persistence, Google state/nonce/replay/claim validation, and the
 original admin lifecycle. A mocked OAuth exchange is not real Google acceptance.
+
+## Workspace navigation follow-up
+
+Login now opens `/admin` directly; `/app` redirects there. Public Feed opens inside
+the management shell with a copyable iframe snippet above its live preview.
+**Mock Website** remains a separate sidebar destination (the existing per-account
+`/u/<id>/embed-demo` route), for demonstrating how a feed will look within a target
+integration website. Adapt that mock to each integration partner's requirements
+when supplied. The current MSRG mock is an initial template, not the generic feed
+configuration page.

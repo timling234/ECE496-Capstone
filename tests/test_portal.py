@@ -121,6 +121,8 @@ class PortalTests(unittest.TestCase):
         self.assertIn(b'aria-label="Feed embed code"', feed_console)
         self.assertIn(('src="http://localhost/u/'+user['id']+'/feed"').encode(), feed_console)
         self.assertNotIn(b'Embedding Preview', client.get('/admin').data)
+        self.assertIn(b'Mock Website', client.get('/admin').data)
+        self.assertIn(('href="/u/'+user['id']+'/embed-demo"').encode(), client.get('/admin').data)
         preview = client.get('/u/'+user['id']+'/embed-demo')
         self.assertIn(('src="/u/'+user['id']+'/feed"').encode(), preview.data)
 

@@ -25,7 +25,7 @@ def render_console(posts,history,settings,config,session,view,esc,card,runtime=N
         cls='good' if value in ('Healthy','Running','Connected','PASS') else 'bad' if value in ('Error','FAIL','TIMEOUT') else 'warn' if value in ('Pending Access','Waiting','RUNNING','Fetching','Queued') else ''
         return '<span class="badge '+cls+'">'+esc(value)+'</span>'
     navigation=[('dashboard','Dashboard'),('pending','Review Queue'),('sources','Sources'),('testing','Testing / Development'),('settings','Settings'),('approved','Published'),('rejected','Rejected')]
-    feed_navigation=('<a class="'+('active' if view=='feed' else '')+'" href="/admin?view=feed">Public Feed</a>' if feed_url else '<a href="/feed" target="_blank">Public Feed ↗</a><a href="/embed-demo" target="_blank">Embedding Preview ↗</a>')
+    feed_navigation=('<a class="'+('active' if view=='feed' else '')+'" href="/admin?view=feed">Public Feed</a><a href="/embed-demo" target="_blank" rel="noopener">Mock Website ↗</a>' if feed_url else '<a href="/feed" target="_blank">Public Feed ↗</a><a href="/embed-demo" target="_blank">Mock Website ↗</a>')
     body='<header><h1>ASAP Admin</h1><span>Operations console · '+form('/logout',{},'Sign out')+'</span></header><div class="layout"><aside>'+''.join('<a class="'+('active' if v==view else '')+'" href="/admin?view='+v+'">'+label+'</a>' for v,label in navigation)+feed_navigation+'</aside><main>'
     body+='<p><a href="/admin?view='+esc(view)+'">Refresh status / results</a></p>'
     if notice:body+='<div class="notice">'+esc(notice)+'</div>'

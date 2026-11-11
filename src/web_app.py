@@ -146,7 +146,7 @@ def make_handler(db,password,host='127.0.0.1',port=5000,runtime=None,dev_enabled
                 return self.send(200,page('Admin sign in','<form method="post" action="/login"><input type="hidden" name="csrf" value="'+sessions[token]['csrf']+'"><label>Password <input type="password" name="password" required autocomplete="current-password"></label><button>Sign in</button></form>'),
                     cookie_name+'='+token+cookie_secure+'; HttpOnly; SameSite=Strict; Path=/; Max-Age=600')
             if route=='/embed-demo':
-                return self.send(200,page('Mock MSRG Website',mock_body()))
+                return self.send(200,page('Mock Website',mock_body()))
             if route=='/feed':
                 with closing(self.db_connection()) as conn:
                     posts=publishable(conn); settings=presentation(conn)
