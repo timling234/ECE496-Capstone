@@ -50,10 +50,10 @@ def items(conn):
     return posts
 
 
-def decide(conn, platform, post_id, action, actor='admin'):
+def decide(conn, platform, post_id, action, actor='admin', *, transaction=True):
     """FR-6/FR-7: atomic selection, rejection, withdrawal and action history."""
     if action not in ('approve','reject','withdraw','pin','unpin'): raise ValueError('Unknown action')
-    conn.execute('BEGIN IMMEDIATE')
+    if transaction:conn.execute('BEGIN IMMEDIATE')
     try:
         posts=items(conn); p=next((p for p in posts if (p['platform'],p['post_id'])==(platform,post_id)),None)
         if p is None: raise ValueError('Post not found')
@@ -62,7 +62,8 @@ def decide(conn, platform, post_id, action, actor='admin'):
         if action in ('pin','unpin'):
             conn.execute('INSERT OR REPLACE INTO feed_order VALUES (?,?,?,?)',(platform,post_id,int(action=='pin'),p['position']))
             conn.execute('INSERT INTO editorial_actions(platform,post_id,action,actor,acted_at) VALUES (?,?,?,?,?)',(platform,post_id,action,actor,now))
-            conn.commit(); return
+            if transaction:conn.commit()
+            return
         changes=[(p,{'approve':'approved','reject':'rejected','withdraw':'pending'}[action],action)]
         if action=='approve' and p['group']:
             changes += [(other,'rejected','duplicate_not_selected') for other in posts
@@ -74,9 +75,10 @@ def decide(conn, platform, post_id, action, actor='admin'):
             conn.execute('INSERT OR REPLACE INTO editorial_reasons VALUES (?,?,?)',(target['platform'],target['post_id'],event if event=='duplicate_not_selected' else action))
             conn.execute('INSERT INTO editorial_actions(platform,post_id,action,actor,acted_at) VALUES (?,?,?,?,?)',
                 (target['platform'],target['post_id'],event,actor,now))
-        conn.commit()
+        if transaction:conn.commit()
     except Exception:
-        conn.rollback(); raise
+        if transaction:conn.rollback()
+        raise
 
 
 def publishable(conn):

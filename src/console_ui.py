@@ -8,7 +8,7 @@ from .dev_tools import TESTS, LIVE, credentials
 STYLE="""
 .ai-suggestion{background:#f1f6fb;border-left:3px solid #7397c4;padding:10px;margin:12px 0}
 
-.provider-picker{display:flex;gap:12px;margin:16px 0}.source-actions{text-align:right}.provider-option{color:#205a8b;font-size:14px;display:flex;align-items:center;gap:9px;padding:12px 18px;border:1px solid #ccd5df;border-radius:6px;text-decoration:none;background:#f8fafc}.provider-option.selected{background:#e4eef8;border:2px solid #2e63a5;padding:11px 17px}.source-editor>form{display:block}
+.provider-picker{display:flex;gap:12px;margin:16px 0}.source-actions{text-align:right}.provider-option{color:#205a8b;font-size:14px;display:flex;align-items:center;gap:9px;padding:12px 18px;border:1px solid #ccd5df;border-radius:6px;text-decoration:none;background:#f8fafc}.provider-option.selected{background:#e4eef8;border:2px solid #2e63a5;padding:11px 17px}.source-editor>form{display:block}.source-editor select{max-width:100%}
 
 body{max-width:none;margin:0;padding:0;font:14px system-ui;background:#edf0f3;color:#253240}
 h1{font-size:21px;margin:0}h2{font-size:17px;margin:0 0 12px}h3{font-size:15px}header{background:#192b3d;color:white;padding:16px 24px;display:flex;justify-content:space-between;align-items:center}
@@ -30,7 +30,7 @@ def stamp(value):
     return datetime.fromtimestamp(value,timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC') if value is not None else 'Never'
 
 
-def render_console(posts,history,settings,config,session,view,esc,card,runtime=None,devtools=None,notice='',query=None,notification_config=None,notification_state=None,feed_url=None,connection_choices=None):
+def render_console(posts,history,settings,config,session,view,esc,card,runtime=None,devtools=None,notice='',query=None,notification_config=None,notification_state=None,feed_url=None,connection_choices=None,ai_panel=None):
     query=query or {}
     connection_choices=connection_choices or []
     csrf=session['csrf']
@@ -116,6 +116,21 @@ def render_console(posts,history,settings,config,session,view,esc,card,runtime=N
                 body+='<details '+('open' if run==runs[0] else '')+'><summary>'+badge(run['status'])+' '+esc(run['test_id'])+' · '+esc(stamp(run['started_at']))+' · %.2fs'%run['duration']+'</summary><pre>'+esc(run['output'] or 'Task running… refresh to see results.')+'</pre>'+link+'</details>'
             body+='</section>'
     elif view=='settings':
+        if ai_panel:
+            ai=ai_panel;cfg=ai['config']
+            body+='<section class="panel source-editor"><h2>Local AI</h2><p>Models run on Jarvis. Model files are shared; your selected model and review rules apply only to your workspace.</p>'
+            if ai['error']:body+='<p class="notice">'+esc(ai['error'])+'</p>'
+            body+='<form method="post" action="/llm/settings"><input type="hidden" name="csrf" value="'+csrf+'"><label>Installed model <select name="model" required>'
+            for name,size in ai['installed'].items():
+                body+='<option value="'+esc(name)+'" '+('selected' if name==cfg['model'] else '')+'>'+esc(name)+' · '+('%.1f GB'%(size/1e9))+'</option>'
+            body+='</select></label><p>Applied model: <b>'+esc(cfg['model'])+'</b></p><label>Review policy<textarea name="policy" rows="5" minlength="10" maxlength="4000" required>'+esc(cfg['policy'])+'</textarea></label><label>Posts per batch <input type="number" name="batch_limit" min="1" max="50" value="'+str(cfg['batch_limit'])+'"></label><p>Keep both options off for suggestions only. Approvals publish to your public feed. Automation runs only when you click Run automatic review.</p><label><input type="checkbox" name="auto_approve" '+('checked' if cfg['auto_approve'] else '')+'>Allow automatic approve</label><label><input type="checkbox" name="auto_reject" '+('checked' if cfg['auto_reject'] else '')+'>Allow automatic reject</label><p><small>Duplicate groups are analyzed together. Approving a representative and rejecting alternatives requires both options. Uncertain or changed groups stay for manual review.</small></p><button '+('disabled' if not ai['installed'] else '')+'>Apply model and settings</button></form>'
+            body+='<h3>Download a local model</h3><p>Downloads use Jarvis disk space and internet bandwidth. After completion, choose the model above and apply it.</p><form method="post" action="/llm/download"><input type="hidden" name="csrf" value="'+csrf+'"><select name="model" required>'
+            body+=''.join('<option value="'+esc(name)+'">'+esc(label)+(' · Installed' if name in ai['installed'] else '')+'</option>' for name,label in ai['catalog'].items())+'</select><button>Download</button></form>'
+            for name,status,progress,error in ai['downloads']:body+='<p>'+esc(name)+' · '+esc(status)+' · '+str(progress)+'% '+esc(error or '')+'</p>'
+            body+='<h3>Automatic review history</h3>'
+            for action,reason,actor,when,platform,post_id in ai['audit']:body+='<p><b>'+esc(action)+'</b> · '+esc(platform)+' · '+esc(stamp(when))+' · '+esc(actor)+'<br>'+esc(reason)+'</p>'
+            if not ai['audit']:body+='<p>No automatic decisions yet.</p>'
+            body+='</section>'
         from .notifications import smtp_ready
         notify=notification_config or dict(enabled=0,channel='email',recipient='')
         state=notification_state or dict(pending=0,sent=0,error='')
@@ -123,6 +138,13 @@ def render_console(posts,history,settings,config,session,view,esc,card,runtime=N
         body+='<section class="panel"><h2>Feed appearance</h2><form method="post" action="/presentation"><input type="hidden" name="csrf" value="'+csrf+'"><label>Link color <input type="color" name="accent" value="'+esc(settings['accent'])+'"></label><label> Font size <input type="number" name="font_size" min="12" max="24" value="'+str(settings['font_size'])+'"></label><label><input type="checkbox" name="show_origin" '+('checked' if settings['show_origin'] else '')+'>Show source origin</label><button>Save appearance</button></form></section>'
     else:
         if view=='pending':
+            if ai_panel:
+                cfg=ai_panel['config']
+                body+='<section class="panel"><h2>AI review</h2><p>Review pending posts and possible duplicate groups with '+esc(cfg['model'])+'. Suggestions remain available per post.</p>'+form('/llm/batch',{'mode':'advice'},'Suggest for queue')+form('/llm/batch',{'mode':'automatic'},'Run automatic review',not (cfg['auto_approve'] or cfg['auto_reject']))+' <a href="/admin?view=settings">Local AI settings</a>'
+                for batch,status,mode,total,done,applied,error in ai_panel['batches']:
+                    body+='<p>Batch '+str(batch)+' · '+esc(mode)+' · '+esc(status)+' · '+str(done)+'/'+str(total)+' reviewed · '+str(applied)+' applied '+esc(error or '')+'</p>'
+                    if status=='running':body+=form('/llm/cancel',{'batch_id':batch},'Stop batch')
+                body+='</section>'
             chosen_needs='needs_review' in query if 'filters_set' in query else True
             chosen_duplicates='duplicates' in query if 'filters_set' in query else True
             body+='<h2>Review Queue</h2><form class="panel review-filters" method="get" action="/admin"><input type="hidden" name="view" value="pending"><input type="hidden" name="filters_set" value="1"><label><input type="checkbox" name="needs_review" '+('checked' if chosen_needs else '')+'>Needs Review</label><label><input type="checkbox" name="duplicates" '+('checked' if chosen_duplicates else '')+'>Possible Duplicates</label><button>Apply filters</button></form>'

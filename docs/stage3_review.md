@@ -1,45 +1,44 @@
-# Stage 3: local AI review suggestions
+# Stage 3: local AI review
 
-The first increment adds **AI review suggestion** to private review cards. Click
-it explicitly and refresh results after the local model finishes. The worker
-returns Approve, Reject, or Needs review plus a short reason; the existing human
-Approve/Reject/Withdraw controls remain the only publication authority. No
-scheduled inference or automatic decisions are enabled.
+Settings → Local AI lists installed local Ollama models and a small download catalog.
+Download runs in the background; refresh for progress, then select the installed
+model and Apply. Model files are shared on Jarvis; model selection, editorial
+policy, action permissions and batch limit belong to each workspace. Cloud models
+are excluded. The operator sets the local service URL in private environment
+configuration; browser requests cannot supply a service URL or arbitrary model tag.
 
-Jarvis uses its already-installed `gemma4:e2b-it-qat` through local Ollama. No model
-download, external LLM API, account credentials, or cloud key is required.
-`ASAP_LLM_URL=http://host.lima.internal:11434` and `ASAP_LLM_MODEL` select the local
-service in private `.env`. A model URL supplied by a browser is never accepted.
-The current adapter accepts only localhost / Docker host aliases over HTTP.
+Suggestions remain the default. Individual cards and Suggest for queue generate
+Approve / Reject / Needs review with reasons. To execute decisions, explicitly
+enable automatic approve and/or reject in Settings, then click Run automatic
+review. This starts one bounded batch, not continuous unattended moderation.
+Both permissions start disabled. Existing human controls remain available.
 
-A single background slot prevents an unbounded local model queue. Requests require
-workspace authentication and CSRF and are throttled. Model timeout is 120 seconds,
-output is capped at 64 KiB, redirects/proxies are disabled, and invalid output
-becomes an error for manual retry. Read-only page views never invoke a model.
+Possible duplicates are analyzed together, with at most one selected representative.
+Approving a pending representative and rejecting alternatives requires both action
+permissions. An existing published representative can be preserved while pending
+duplicates are rejected. Uncertain, oversized or inconsistent groups require manual
+review. Completed human decisions are preserved. Content, group membership,
+editorial decisions or settings changing during inference prevent stale execution.
+Group actions commit atomically. Stop batch prevents further application; it does
+not undo already committed decisions or immediately unload an active inference.
 
-The system prompt treats post text as untrusted input and supplies a conservative,
-generic editorial policy. Only post text, platform, and creation time are sent to
-the local model; URLs are not fetched, no tools are available, and returned text
-is escaped. A schema restricts the recommendation and bounded reason. Text beyond
-6,000 characters always requires manual review. This is a baseline suggestion
-model, not a demonstrated guarantee of editorial accuracy; tailor and evaluate the
-policy before introducing automated decisions.
+Each workspace SQLite stores settings, suggestions, batch progress, download status
+and automation audit records with model, policy, reasons, actor and timestamps.
+Identical unchanged analysis is reused. Public feeds never display private AI
+advice. Restarted jobs are marked interrupted rather than replayed. Posts are
+untrusted model input; the model has no tools, and output is validated and escaped.
 
-Each workspace stores immutable request/audit fields in its own SQLite
-`ai_suggestions`: content fingerprint, policy, model, actor, timestamps, result or
-safe failure. Model advice never writes editorial decisions. Identical unchanged
-requests reuse a completed result; changed content marks advice stale, including
-changes while the model is running. Startup marks interrupted jobs retryable.
-Public feeds never include suggestions. Human decisions retain their existing
-separate editorial action audit.
+One shared inference slot and one shared download slot bound background activity.
+Authenticated POST routes require CSRF and rate limits. Download tags are
+allowlisted; transport rejects redirects and proxies. Downloads use Jarvis disk
+and bandwidth and are not automatically applied.
 
-Validation: offline tests cover ownership/CSRF, background execution, caching,
-staleness, restart, errors, endpoint limits, response validation, output escaping,
-and unchanged publication status. One real **local** inference on a fictional
-seminar announcement returned a valid Approve suggestion with a reason; no real
-user post was submitted during deployment checks. Future work: workspace-specific
-policy, evaluation cases, then explicit opt-in auto approve/reject with audit and
-human override.
+Validation used targeted offline checks for workspace isolation, settings,
+mocked downloads, guarded execution and duplicate transactions. One real local
+inference used two fictional duplicate posts in a disposable database and approved
+one while rejecting the other. No production posts were automatically moderated,
+no new model was downloaded, and no social API was called for this increment.
 
 References: [Ollama chat API](https://docs.ollama.com/api/chat),
-[structured output](https://docs.ollama.com/capabilities/structured-outputs).
+[structured output](https://docs.ollama.com/capabilities/structured-outputs),
+[model downloads](https://docs.ollama.com/api/pull).

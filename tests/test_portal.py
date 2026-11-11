@@ -123,6 +123,28 @@ class PortalTests(unittest.TestCase):
         self.assertNotIn(b'Clear local event.',self.b.get('/admin?view=pending').data)
         self.assertNotIn(b'Alice private event',self.a.get('/u/'+alice['id']+'/feed').data)
 
+    def test_local_ai_settings_download_and_batch_are_workspace_bound(self):
+        from src.ai_settings import settings as ai_settings
+        from src.review_ai import POLICY
+        alice=self.register(self.a,'alice@example.com');bob=self.register(self.b,'bob@example.com')
+        models=self.app.extensions['models'];models.installed=Mock(return_value={'fixture':1000})
+        reviewer=self.app.extensions['reviewer'];reviewer.model=Mock(ready=True,model='fixture',policy=POLICY)
+        reviewer.model.review.return_value=dict(recommendation='approve',reason='Clear event.')
+        data=dict(model='fixture',policy=POLICY,auto_approve='on',auto_reject='on',batch_limit=5)
+        self.assertEqual(self.a.post('/llm/settings',data=dict(csrf='bad',**data)).status_code,403)
+        self.assertEqual(self.post(self.a,'/llm/settings',data).status_code,303)
+        self.assertEqual(self.app.test_client().post('/llm/download',data={'model':'qwen3:4b'}).status_code,403)
+        self.assertEqual(self.post(self.a,'/llm/download',dict(model='https://attacker.example')).status_code,400)
+        with closing(sqlite3.connect(self.workspaces.get(alice['id']).db)) as conn:self.assertEqual(ai_settings(conn)['auto_approve'],1)
+        with closing(sqlite3.connect(self.workspaces.get(bob['id']).db)) as conn:self.assertEqual(ai_settings(conn)['auto_approve'],0)
+        self.assertIn(b'Local AI',self.a.get('/admin?view=settings').data)
+        self.post(self.a,'/announcement',dict(text='Date: November 11, 2026. Public event.'))
+        self.assertEqual(self.post(self.b,'/llm/batch',dict(mode='automatic')).status_code,400)
+        self.assertEqual(self.post(self.a,'/llm/batch',dict(mode='automatic',user_id=bob['id'])).status_code,303)
+        self.assertTrue(reviewer.slot.acquire(timeout=3));reviewer.slot.release()
+        self.assertIn(b'Public event.',self.a.get('/u/'+alice['id']+'/feed').data)
+        self.assertNotIn(b'Public event.',self.b.get('/u/'+bob['id']+'/feed').data)
+
     def test_legacy_admin_and_public_feed_compatibility(self):
         client = self.app.test_client()
         login = client.get('/login')

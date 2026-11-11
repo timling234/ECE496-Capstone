@@ -23,7 +23,7 @@ def initialize(conn):
     conn.execute('CREATE INDEX IF NOT EXISTS ai_post ON ai_suggestions(platform,post_id,id)')
 
 
-def attach(conn,posts,enabled=False):
+def attach(conn,posts,enabled=False,config=None):
     initialize(conn)
     conn.row_factory=sqlite3.Row
     latest={}
@@ -33,13 +33,22 @@ def attach(conn,posts,enabled=False):
         post['ai_available']=enabled
         row=latest.get((post['platform'],post['post_id']))
         if row:
-            post['ai_review']=dict(row,stale=row['fingerprint']!=fingerprint(post))
+            context_stale=False
+            if row.get('snapshot'):
+                try:
+                    expected={(p['platform'],p['post_id']):p['fingerprint'] for p in json.loads(row['snapshot'])}
+                    members=[p for p in posts if p['group']==post['group']] if post['group'] else [post]
+                    actual={(p['platform'],p['post_id']):fingerprint(p) for p in members}
+                    context_stale=actual!=expected
+                except (ValueError,KeyError,TypeError):context_stale=True
+            post['ai_review']=dict(row,stale=context_stale or row['fingerprint']!=fingerprint(post) or bool(config and (row['model']!=config['model'] or row['policy']!=config['policy'])))
 
 
 class LocalModel:
-    def __init__(self,url=None,model=None):
+    def __init__(self,url=None,model=None,policy=POLICY):
         self.url=(os.environ.get('ASAP_LLM_URL','') if url is None else url).rstrip('/')
         self.model=os.environ.get('ASAP_LLM_MODEL','') if model is None else model
+        self.policy=policy
         p=urlparse(self.url)
         self.ready=bool(self.model and p.scheme=='http' and p.hostname in ('127.0.0.1','localhost','host.lima.internal','host.docker.internal') and not p.path and not p.query and not p.fragment and not p.username and not p.password)
 
@@ -47,7 +56,17 @@ class LocalModel:
         if not self.ready:raise ValueError('Local model unavailable')
         text=post['text'][:6000]
         content=json.dumps(dict(text=text,platform=post['platform'],created_at=post.get('created_at'),truncated=len(post['text'])>6000),ensure_ascii=False)
-        payload=dict(model=self.model,stream=False,think=False,format=SCHEMA,messages=[{'role':'system','content':SYSTEM},{'role':'user','content':content}],options={'temperature':0,'num_predict':400},keep_alive='5m')
+        result=self.generate(SYSTEM[:-len(POLICY)]+self.policy,content,SCHEMA)
+        if (not isinstance(result,dict) or set(result)!=set(SCHEMA['required'])
+                or result['recommendation'] not in ('approve','reject','needs_review')
+                or not isinstance(result['reason'],str) or not 1<=len(result['reason'].strip())<=1000):
+            raise ValueError('Model response invalid')
+        if len(post['text'])>6000:
+            result=dict(recommendation='needs_review',reason='The post exceeds the review limit; review its full content manually.')
+        return result
+
+    def generate(self,system,content,schema,tokens=400):
+        payload=dict(model=self.model,stream=False,think=False,format=schema,messages=[{'role':'system','content':system},{'role':'user','content':content}],options={'temperature':0,'num_predict':tokens},keep_alive='5m')
         with requests.Session() as session:
             session.trust_env=False
             with session.post(self.url+'/api/chat',json=payload,timeout=(5,120),allow_redirects=False,stream=True) as response:
@@ -59,14 +78,7 @@ class LocalModel:
         data=json.loads(raw)
         if data.get('done') is not True or data.get('error') or data.get('message',{}).get('tool_calls'):
             raise ValueError('Model response invalid')
-        result=json.loads(data['message']['content'])
-        if (not isinstance(result,dict) or set(result)!=set(SCHEMA['required'])
-                or result['recommendation'] not in ('approve','reject','needs_review')
-                or not isinstance(result['reason'],str) or not 1<=len(result['reason'].strip())<=1000):
-            raise ValueError('Model response invalid')
-        if len(post['text'])>6000:
-            result=dict(recommendation='needs_review',reason='The post exceeds the review limit; review its full content manually.')
-        return result
+        return json.loads(data['message']['content'])
 
 
 class Reviewer:

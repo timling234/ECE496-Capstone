@@ -60,7 +60,8 @@ def card(p,csrf=None,show_origin=True,return_view="pending"):
                 body+='<p><small>AI suggestion is outdated. Request a new review.</small></p>'
             elif review['status']=='complete':
                 label={'approve':'Approve','reject':'Reject','needs_review':'Needs review'}.get(review['recommendation'],'Needs review')
-                body+='<section class="ai-suggestion"><b>AI suggestion: '+esc(label)+'</b><p>'+esc(review['reason'])+'</p><small>Suggestion only · You decide · '+esc(review['model'])+'</small></section>'
+                body+='<section class="ai-suggestion"><b>AI suggestion: '+esc(label)+'</b><p>'+esc(review['reason'])+'</p><small>AI analysis · '+esc(review['model'])+'</small></section>'
+                if review.get('execution'):body+='<p><small>'+esc(review['execution'])+'</small></p>'
             elif review['status']=='error':body+='<p><small>'+esc(review['error'])+'</small></p>'
             else:body+='<p><small>AI review in progress. Refresh results shortly.</small></p>'
         if p.get('ai_available'):
@@ -183,14 +184,14 @@ def make_handler(db,password,host='127.0.0.1',port=5000,runtime=None,dev_enabled
             with closing(self.db_connection()) as conn:
                 posts=items(conn)
                 from .review_ai import attach
-                attach(conn,posts,enabled=getattr(self,'ai_ready',False))
+                attach(conn,posts,enabled=getattr(self,'ai_ready',False),config=getattr(self,'ai_config',None))
                 settings=presentation(conn)
                 notification_config=notifications.settings(conn)
                 notification_state=notifications.summary(conn)
                 conn.commit()
                 history=conn.execute('SELECT action,platform,post_id,actor,acted_at FROM editorial_actions ORDER BY id DESC LIMIT 20').fetchall()
             body=render_console(posts,history,settings,self.read_config(),session,view,esc,card,self.runtime,self.devtools,
-                query.get('notice',[''])[0],query=query,connection_choices=choices(self.read_config(),self.config_path.parent),notification_config=notification_config,notification_state=notification_state,feed_url=getattr(self,'feed_url',None))
+                query.get('notice',[''])[0],query=query,ai_panel=getattr(self,'ai_panel',None),connection_choices=choices(self.read_config(),self.config_path.parent),notification_config=notification_config,notification_state=notification_state,feed_url=getattr(self,'feed_url',None))
             self.send(200,page('ASAP Admin',body,console=True))
         def do_POST(self):
             session=self.session()

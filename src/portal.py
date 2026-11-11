@@ -23,7 +23,8 @@ from .web_app import make_handler, page, esc
 from .workspaces import Workspace, Workspaces
 from .portal_ui import auth_page, home_page
 from .social_oauth import SocialOAuth
-from .review_ai import Reviewer
+from .ai_automation import AutomationReviewer,initialize as initialize_ai
+from .ai_settings import ModelManager,CATALOG,save as save_ai_settings
 
 COOKIE = 'asap_portal'
 
@@ -42,15 +43,17 @@ def create_app(db, password, runtime=None, *, start_workers=False, google=None, 
     workspaces = Workspaces(db.parent / 'workspaces', accounts, default, start_workers)
     handler_class = make_handler(db, password, port=5000, runtime=runtime, linkedin_oauth=default.oauth)
     social = SocialOAuth()
-    reviewer = Reviewer()
+    reviewer = AutomationReviewer()
+    models = ModelManager(reviewer.model)
     legacy_sessions = {}
     cache_lock = threading.RLock()
-    app.extensions.update(accounts=accounts, workspaces=workspaces, google=google, social=social,reviewer=reviewer)
+    app.extensions.update(accounts=accounts, workspaces=workspaces, google=google, social=social,reviewer=reviewer,models=models)
     if start_workers:
         workspaces.restore()
 
     for workspace in [default]+[workspaces.get(uid) for uid in accounts.ids()]:
         reviewer.recover(workspace.db)
+        models.recover(workspace.db)
 
     def document(title, body, status=200):
         nav = '<nav><a href="/">ASAP</a>'
@@ -231,6 +234,21 @@ def create_app(db, password, runtime=None, *, start_workers=False, google=None, 
             self.config_path = workspace.runtime.config_path if workspace.runtime else workspace.db.parent / 'polling.local.json'
             self.devtools = None
             self.ai_ready = reviewer.model.ready
+            self.ai_config = reviewer.config(workspace.db)
+            self.ai_panel = None
+            if request.path=='/admin' and request.args.get('view') in ('settings','pending'):
+                installed={};model_error=''
+                if request.args.get('view')=='settings':
+                    try:installed=models.installed()
+                    except Exception:model_error='Local model service unavailable. Refresh to retry.'
+                with closing(sqlite3.connect(workspace.db,timeout=15)) as conn:
+                    initialize_ai(conn)
+                    batches=conn.execute('SELECT id,status,mode,total,done,applied,error FROM ai_batches ORDER BY id DESC LIMIT 5').fetchall()
+                    downloads=conn.execute('SELECT model,status,progress,error FROM ai_model_downloads ORDER BY id DESC LIMIT 5').fetchall()
+                    audit=conn.execute('SELECT action,reason,actor,created_at,platform,post_id FROM ai_automation_actions ORDER BY id DESC LIMIT 20').fetchall()
+                    conn.commit()
+                self.ai_panel=dict(config=self.ai_config,installed=installed,catalog=CATALOG,error=model_error,batches=batches,downloads=downloads,audit=audit)
+
             self.feed_url = request.host_url.rstrip('/') + ('/u/'+g.user['id']+'/feed' if g.user else '/feed')
             self.path = request.full_path.rstrip('?')
             self.headers = request.headers
@@ -264,6 +282,34 @@ def create_app(db, password, runtime=None, *, start_workers=False, google=None, 
             return redirect('/admin?view=pending&notice=AI+review+requested.+Refresh+results+to+see+the+suggestion.',303)
         except ValueError as exc:
             return document('AI review unavailable','<p>'+esc(exc)+'</p><a href="/admin?view=pending">Back to review queue</a>',400)
+
+    @app.post('/llm/settings')
+    @app.post('/llm/download')
+    @app.post('/llm/batch')
+    @app.post('/llm/cancel')
+    def ai_controls():
+        workspace=workspaces.get(g.user['id']) if g.user else default
+        session=Adapter(workspace).session()
+        if not session or not session.get('authenticated'):abort(403)
+        if not secrets.compare_digest(request.form.get('csrf',''),session['csrf']):abort(403)
+        throttle('ai-controls:'+str(g.user['id'] if g.user else 'admin'),6,60)
+        try:
+            if request.path=='/llm/settings':
+                installed=models.installed(force=True)
+                with closing(sqlite3.connect(workspace.db,timeout=15)) as conn:save_ai_settings(conn,request.form,installed)
+                return redirect('/admin?view=settings&notice=Local+AI+settings+saved.',303)
+            if request.path=='/llm/download':
+                models.download(workspace.db,request.form.get('model',''))
+                return redirect('/admin?view=settings&notice=Download+requested.+Refresh+to+check+progress,+then+apply+the+model.',303)
+            if request.path=='/llm/cancel':
+                reviewer.cancel(workspace.db,request.form.get('batch_id',''))
+                return redirect('/admin?view=pending&notice=Batch+stop+requested.',303)
+            reviewer.run_batch(workspace.db,g.user['id'] if g.user else 'admin',request.form.get('mode','advice'))
+            return redirect('/admin?view=pending&notice=AI+batch+started.+Refresh+results+to+check+progress.',303)
+        except ValueError as exc:
+            return document('Local AI request unavailable','<p>'+esc(exc)+'</p><a href="/admin?view=settings">Local AI settings</a>',400)
+        except Exception:
+            return document('Local AI unavailable','<p>Check the local model service and try again.</p><a href="/admin?view=settings">Back to settings</a>',400)
 
     @app.get('/bluesky/client-metadata.json')
     def bluesky_client_metadata():
