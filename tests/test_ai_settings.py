@@ -36,11 +36,11 @@ class ModelSettingsTests(unittest.TestCase):
 
     def test_preferences_require_installed_model_and_are_database_local(self):
         with closing(sqlite3.connect(self.db)) as conn:
-            self.assertEqual(settings(conn,'fixture')['auto_approve'],0)
+            self.assertEqual(settings(conn,'fixture')['auto_approve'],1)
             with self.assertRaises(ValueError):save(conn,dict(model='cloud',policy=POLICY),{'fixture':1})
             save(conn,dict(model='fixture',policy=POLICY,auto_approve='on',batch_limit=5),{'fixture':1})
             self.assertEqual(settings(conn)['model'],'fixture');self.assertEqual(settings(conn)['auto_reject'],0)
-        with closing(sqlite3.connect(':memory:')) as other:self.assertEqual(settings(other,'default')['auto_approve'],0)
+        with closing(sqlite3.connect(':memory:')) as other:self.assertEqual(settings(other,'default')['auto_approve'],1)
 
     def test_streamed_model_download_finishes_then_is_available_for_apply(self):
         name=next(iter(CATALOG))

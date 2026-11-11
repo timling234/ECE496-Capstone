@@ -79,6 +79,7 @@ class AutomationReviewer(Reviewer):
             selected=next((p for p in posts if (p['platform'],p['post_id'])==target),None) if target else None
             if target and not selected:raise ValueError('Post not found in this workspace')
             seeds=[selected] if target else [p for p in posts if p['editorial_status'] in ('pending','needs review')]
+            if not seeds:raise ValueError('No pending posts to review.')
             units=[];seen=set();count=0
             for seed in seeds:
                 key=('group',seed['group']) if seed['group'] else (seed['platform'],seed['post_id'])

@@ -1,17 +1,17 @@
 # Stage 3: local AI review
 
 Settings → Local AI lists installed local Ollama models and a small download catalog.
-Download runs in the background; refresh for progress, then select the installed
+Download runs in the background; progress updates automatically, then select the installed
 model and Apply. Model files are shared on the server; model selection, editorial
 policy, action permissions and batch limit belong to each workspace. Cloud models
 are excluded. The operator sets the local service URL in private environment
 configuration; browser requests cannot supply a service URL or arbitrary model tag.
 
-Suggestions remain the default. Individual cards and Suggest for queue generate
+Individual cards and Suggest for queue generate
 Approve / Reject / Needs review with reasons. To execute decisions, explicitly
-enable automatic approve and/or reject in Settings, then click Run automatic
+select automatic approve and/or reject in Settings, then click Run automatic
 review. This starts one bounded batch, not continuous unattended moderation.
-Both permissions start disabled. Existing human controls remain available.
+Both permissions are checked by default; saved choices are preserved. No decisions run merely by opening a page. Existing human controls remain available.
 
 Possible duplicates are analyzed together, with at most one selected representative.
 Approving a pending representative and rejecting alternatives requires both action
@@ -46,3 +46,7 @@ References: [Ollama chat API](https://docs.ollama.com/api/chat),
 Deployment note: the current Mac is temporary hosting. Migration of the website,
 workspace databases, credentials and local models to a delivery server is deferred
 until project handover. User-facing wording uses “Server”.
+
+Console forms show success/error notifications over the current page. Background
+progress updates use authenticated same-origin page reads; they never trigger
+provider retrieval or model inference. Updates pause while editing a form.

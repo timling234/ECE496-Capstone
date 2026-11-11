@@ -18,7 +18,7 @@ def initialize(conn):
 def settings(conn,default_model=''):
     initialize(conn)
     row=conn.execute('SELECT model,policy,auto_approve,auto_reject,batch_limit FROM ai_settings WHERE id=1').fetchone()
-    return dict(zip(('model','policy','auto_approve','auto_reject','batch_limit'),row or (default_model,POLICY,0,0,20)))
+    return dict(zip(('model','policy','auto_approve','auto_reject','batch_limit'),row or (default_model,POLICY,1,1,20)))
 
 
 def save(conn,values,installed):

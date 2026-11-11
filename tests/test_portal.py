@@ -136,7 +136,7 @@ class PortalTests(unittest.TestCase):
         self.assertEqual(self.app.test_client().post('/llm/download',data={'model':'qwen3:4b'}).status_code,403)
         self.assertEqual(self.post(self.a,'/llm/download',dict(model='https://attacker.example')).status_code,400)
         with closing(sqlite3.connect(self.workspaces.get(alice['id']).db)) as conn:self.assertEqual(ai_settings(conn)['auto_approve'],1)
-        with closing(sqlite3.connect(self.workspaces.get(bob['id']).db)) as conn:self.assertEqual(ai_settings(conn)['auto_approve'],0)
+        with closing(sqlite3.connect(self.workspaces.get(bob['id']).db)) as conn:self.assertEqual(ai_settings(conn)['auto_approve'],1)
         self.assertIn(b'Local AI',self.a.get('/admin?view=settings').data)
         self.post(self.a,'/announcement',dict(text='Date: November 11, 2026. Public event.'))
         self.assertEqual(self.post(self.b,'/llm/batch',dict(mode='automatic')).status_code,400)

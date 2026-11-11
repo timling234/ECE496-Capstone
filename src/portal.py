@@ -106,7 +106,7 @@ def create_app(db, password, runtime=None, *, start_workers=False, google=None, 
         response.headers['Cache-Control'] = 'public, max-age=86400' if request.endpoint=='static' else 'no-store'
         response.headers['X-Content-Type-Options'] = 'nosniff'
         response.headers['Referrer-Policy'] = 'no-referrer'
-        response.headers.setdefault('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; img-src https: http:; form-action 'self' https://www.linkedin.com https://x.com https://bsky.social; base-uri 'none'; frame-src 'self'")
+        response.headers.setdefault('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; img-src https: http:; form-action 'self' https://www.linkedin.com https://x.com https://bsky.social; base-uri 'none'; frame-src 'self'; script-src 'self'; connect-src 'self'")
         if not request.path.endswith('/feed'):
             response.headers['X-Frame-Options'] = 'DENY'
         if secure:
@@ -240,7 +240,7 @@ def create_app(db, password, runtime=None, *, start_workers=False, google=None, 
                 installed={};model_error=''
                 if request.args.get('view')=='settings':
                     try:installed=models.installed()
-                    except Exception:model_error='Local model service unavailable. Refresh to retry.'
+                    except Exception:model_error='Local model service unavailable. Try again later.'
                 with closing(sqlite3.connect(workspace.db,timeout=15)) as conn:
                     initialize_ai(conn)
                     batches=conn.execute('SELECT id,status,mode,total,done,applied,error FROM ai_batches ORDER BY id DESC LIMIT 5').fetchall()
@@ -268,6 +268,10 @@ def create_app(db, password, runtime=None, *, start_workers=False, google=None, 
                 self.response.headers.add('Set-Cookie', cookie)
             return self.response
 
+    @app.get('/console.js')
+    def console_script():
+        return Response(Path(__file__).with_name('console.js').read_text(), content_type='text/javascript; charset=utf-8')
+
     @app.post('/llm/suggest')
     def ai_suggest():
         workspace=workspaces.get(g.user['id']) if g.user else default
@@ -279,7 +283,7 @@ def create_app(db, password, runtime=None, *, start_workers=False, google=None, 
         throttle('ai-review:'+str(g.user['id'] if g.user else 'admin'),3,60)
         try:
             reviewer.submit(workspace.db,request.form.get('platform',''),request.form.get('post_id',''),g.user['id'] if g.user else 'admin')
-            return redirect('/admin?view=pending&notice=AI+review+requested.+Refresh+results+to+see+the+suggestion.',303)
+            return redirect('/admin?view=pending&notice=AI+review+started.+Results+update+automatically.',303)
         except ValueError as exc:
             return document('AI review unavailable','<p>'+esc(exc)+'</p><a href="/admin?view=pending">Back to review queue</a>',400)
 
@@ -300,12 +304,12 @@ def create_app(db, password, runtime=None, *, start_workers=False, google=None, 
                 return redirect('/admin?view=settings&notice=Local+AI+settings+saved.',303)
             if request.path=='/llm/download':
                 models.download(workspace.db,request.form.get('model',''))
-                return redirect('/admin?view=settings&notice=Download+requested.+Refresh+to+check+progress,+then+apply+the+model.',303)
+                return redirect('/admin?view=settings&notice=Download+requested.+Progress+updates+automatically.+Apply+the+model+when+complete.',303)
             if request.path=='/llm/cancel':
                 reviewer.cancel(workspace.db,request.form.get('batch_id',''))
                 return redirect('/admin?view=pending&notice=Batch+stop+requested.',303)
             reviewer.run_batch(workspace.db,g.user['id'] if g.user else 'admin',request.form.get('mode','advice'))
-            return redirect('/admin?view=pending&notice=AI+batch+started.+Refresh+results+to+check+progress.',303)
+            return redirect('/admin?view=pending&notice=AI+batch+started.+Results+update+automatically.',303)
         except ValueError as exc:
             return document('Local AI request unavailable','<p>'+esc(exc)+'</p><a href="/admin?view=settings">Local AI settings</a>',400)
         except Exception:

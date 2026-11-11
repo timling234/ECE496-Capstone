@@ -33,8 +33,9 @@ class AutomationTests(unittest.TestCase):
     def finish(self):
         self.assertTrue(self.reviewer.slot.acquire(timeout=3));self.reviewer.slot.release()
 
-    def test_defaults_are_advice_only_and_single_post_can_be_auto_approved(self):
+    def test_disabling_automation_blocks_execution_and_manual_override_remains(self):
         post_id=self.add()
+        self.configure(False,False)
         with self.assertRaises(ValueError):self.reviewer.run_batch(self.db,'alice','automatic')
         self.configure()
         self.reviewer.run_batch(self.db,'alice','automatic');self.finish()

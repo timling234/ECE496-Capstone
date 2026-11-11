@@ -35,7 +35,7 @@ def page(title,body,settings=None,console=False):
         'article,.panel{background:white;border:1px solid #d8e0e8;border-radius:12px;padding:20px;margin:16px 0}nav{display:flex;gap:16px;flex-wrap:wrap}'
         'button{padding:9px 15px;cursor:pointer;background:#215e95;color:white;border:0;border-radius:6px}input{padding:10px}form{display:inline-block;margin:6px}'
         '.content{white-space:pre-wrap;overflow-wrap:anywhere}small{color:#536579}img{max-width:100%;max-height:300px;border-radius:8px}a{color:#215e95}'
-        +(STYLE if console else '')+'body{font-size:'+str(settings['font_size'])+'px}a{color:'+settings['accent']+'}</style></head><body>'+('' if console else '<h1>'+esc(title)+'</h1>')+body+'</body></html>').encode()
+        +(STYLE if console else '')+'body{font-size:'+str(settings['font_size'])+'px}a{color:'+settings['accent']+'}</style></head><body>'+('' if console else '<h1>'+esc(title)+'</h1>')+body+('<script src="/console.js" defer></script>' if console else '')+'</body></html>').encode()
 
 def card(p,csrf=None,show_origin=True,return_view="pending"):
     status=p.get('editorial_status','approved' if not csrf else 'pending')
@@ -63,7 +63,7 @@ def card(p,csrf=None,show_origin=True,return_view="pending"):
                 body+='<section class="ai-suggestion"><b>AI suggestion: '+esc(label)+'</b><p>'+esc(review['reason'])+'</p><small>AI analysis · '+esc(review['model'])+'</small></section>'
                 if review.get('execution'):body+='<p><small>'+esc(review['execution'])+'</small></p>'
             elif review['status']=='error':body+='<p><small>'+esc(review['error'])+'</small></p>'
-            else:body+='<p><small>AI review in progress. Refresh results shortly.</small></p>'
+            else:body+='<p><small>AI review in progress…</small></p>'
         if p.get('ai_available'):
             running=review and review['status']=='running'
             body+='<form method="post" action="/llm/suggest"><input type="hidden" name="csrf" value="'+csrf+'"><input type="hidden" name="platform" value="'+esc(p['platform'])+'"><input type="hidden" name="post_id" value="'+esc(p['post_id'])+'"><button '+('disabled' if running else '')+'>AI review suggestion</button></form>'
