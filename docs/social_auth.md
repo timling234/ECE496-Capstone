@@ -88,3 +88,27 @@ or revoked grants show Reconnect required; plain public Bluesky sources show Pub
 access. Checking a badge makes no provider requests or token refreshes. Fresh
 reauthentication supersedes older fetch-authentication errors; current errors still
 require reconnect. Connected rows offer Re-authenticate.
+
+## Source management update
+
+The Add Source panel uses three platform icon links and server-selected connected
+accounts. It has no manual account/handle field or nested authentication controls.
+Authenticate from the outer Sources controls first. OAuth normally adds its source
+automatically; the Add panel can restore an account removed from Sources using its
+saved grant. Existing accounts are edited rather than duplicated. Posts per request
+(previously page size) lives in Advanced settings and defaults to 5 where applicable.
+It is an API batch limit, not the public feed's display count; catch-up retrieval
+can still paginate. Existing configured sizes are preserved.
+
+Remove stops retrieval after an active fetch completes. Queued commands for a
+removed source are skipped. Posts, approvals, source checkpoints, rate-limit state
+and grants are retained; deletion does not revoke platform access or withdraw old
+posts. Saved choices are restricted to the current workspace's credential catalog;
+form fields cannot select a foreign account or arbitrary credential path.
+
+Bluesky consent verifies a DID's advertised handle through one forward
+resolveHandle lookup, then reuses an existing matching handle source. The source
+retains its old key/settings/checkpoint while `authorized_account` pins retrieval
+to the verified DID. This prevents a handle and DID becoming two sources. An
+already-created duplicate was repaired with one identity lookup, preserving all
+posts and the original polling state.

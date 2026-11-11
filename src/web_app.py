@@ -18,6 +18,7 @@ from .dev_tools import DevTools
 from . import notifications
 from .feed_ui import feed_body, mock_body
 from .source_config import configure_source, find_source, identity
+from .source_connections import choices
 from .linkedin import OAuth, Credentials
 from .web_editorial import initialize, items, decide, publishable, create_announcement, edit_announcement, set_order, presentation, save_presentation
 
@@ -53,6 +54,18 @@ def card(p,csrf=None,show_origin=True,return_view="pending"):
         body+='<p>Review: '+esc(p['candidate_status'])+' · Editorial: <b>'+esc(p['editorial_status'])+'</b></p>'
         body+='<details class="source-details"><summary>Source details</summary><small>Post ID: '+esc(p['post_id'])+'<br>Source URL: '+esc(p['post_url'])+('<br>Internal duplicate key: '+esc(p['group']) if p['group'] else '')+'</small></details>'
         if p.get('editorial_reason')=='duplicate_not_selected':body+='<p><small>Reason: duplicate_not_selected</small></p>'
+        review=p.get('ai_review')
+        if review:
+            if review['stale'] or review['status']=='stale':
+                body+='<p><small>AI suggestion is outdated. Request a new review.</small></p>'
+            elif review['status']=='complete':
+                label={'approve':'Approve','reject':'Reject','needs_review':'Needs review'}.get(review['recommendation'],'Needs review')
+                body+='<section class="ai-suggestion"><b>AI suggestion: '+esc(label)+'</b><p>'+esc(review['reason'])+'</p><small>Suggestion only · You decide · '+esc(review['model'])+'</small></section>'
+            elif review['status']=='error':body+='<p><small>'+esc(review['error'])+'</small></p>'
+            else:body+='<p><small>AI review in progress. Refresh results shortly.</small></p>'
+        if p.get('ai_available'):
+            running=review and review['status']=='running'
+            body+='<form method="post" action="/llm/suggest"><input type="hidden" name="csrf" value="'+csrf+'"><input type="hidden" name="platform" value="'+esc(p['platform'])+'"><input type="hidden" name="post_id" value="'+esc(p['post_id'])+'"><button '+('disabled' if running else '')+'>AI review suggestion</button></form>'
         actions=['reject']
         if p['candidate_status']=='candidate': actions.insert(0,'approve')
         if p['editorial_status']=='approved': actions=['withdraw','reject','unpin' if p['pinned'] else 'pin']
@@ -169,13 +182,15 @@ def make_handler(db,password,host='127.0.0.1',port=5000,runtime=None,dev_enabled
             if view=='duplicates':return self.redirect('/admin?view=pending&filters_set=1&duplicates=1')
             with closing(self.db_connection()) as conn:
                 posts=items(conn)
+                from .review_ai import attach
+                attach(conn,posts,enabled=getattr(self,'ai_ready',False))
                 settings=presentation(conn)
                 notification_config=notifications.settings(conn)
                 notification_state=notifications.summary(conn)
                 conn.commit()
                 history=conn.execute('SELECT action,platform,post_id,actor,acted_at FROM editorial_actions ORDER BY id DESC LIMIT 20').fetchall()
             body=render_console(posts,history,settings,self.read_config(),session,view,esc,card,self.runtime,self.devtools,
-                query.get('notice',[''])[0],query=query,notification_config=notification_config,notification_state=notification_state,feed_url=getattr(self,'feed_url',None))
+                query.get('notice',[''])[0],query=query,connection_choices=choices(self.read_config(),self.config_path.parent),notification_config=notification_config,notification_state=notification_state,feed_url=getattr(self,'feed_url',None))
             self.send(200,page('ASAP Admin',body,console=True))
         def do_POST(self):
             session=self.session()
@@ -251,12 +266,32 @@ def make_handler(db,password,host='127.0.0.1',port=5000,runtime=None,dev_enabled
                         self.runtime.save_config(config)
                     return self.redirect('/admin?view=sources')
                 except ValueError as exc:return self.send(400,page('Operation unavailable',esc(exc)))
+            if route=='/source-remove':
+                try:
+                    if not self.runtime:raise ValueError('Source runtime required')
+                    self.runtime.remove_source(value('source_key'))
+                    return self.redirect('/admin?view=sources&notice=Source+removed.+Existing+posts+are+kept.')
+                except ValueError as exc:return self.send(400,page('Cannot remove source',esc(exc)))
             if route=='/source-save':
                 try:
-                    config=self.read_config()
-                    configure_source(config,{k:value(k) for k in ('provider','account','interval_seconds','enabled','page_size')},value('source_key') or None)
                     if not self.runtime:raise ValueError('Source management requires the app polling runtime')
-                    self.runtime.save_config(config)
+                    with self.runtime.lock:
+                        config=self.read_config();key=value('source_key') or None
+                        existing=find_source(config,key) if key else None
+                        fields={k:value(k) for k in ('provider','account','interval_seconds','enabled','page_size')}
+                        if key:
+                            if existing is None:raise ValueError('Source not found')
+                            if value('account') and value('account')!=existing['account']:raise ValueError('Connected account cannot be changed')
+                            fields['account']=existing['account']
+                        else:
+                            selected=next((s for s in choices(config,self.config_path.parent) if s['platform']==value('provider') and s['connection_ref']==value('connection_ref')),None)
+                            if not selected:raise ValueError('Authenticate an account from Sources first')
+                            if find_source(config,identity(selected)):raise ValueError('This account is already in Sources; edit its settings instead')
+                            existing={k:v for k,v in selected.items() if k!='connection_ref'}
+                            config['sources'].append(existing);key=identity(existing)
+                            fields['account']=existing['account']
+                        configure_source(config,fields,key)
+                        self.runtime.save_config(config)
                 except ValueError as exc:return self.send(400,page('Invalid source configuration',esc(exc)))
                 return self.redirect('/admin?view=sources')
             if route=='/sources':

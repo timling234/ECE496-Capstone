@@ -111,9 +111,11 @@ class ReviewSourceTests(unittest.TestCase):
         result=render({})
         self.assertIn('+ Add Source',result);self.assertIn('✎',result);self.assertNotIn('Source configuration</h2>',result)
         self.assertNotIn('DO_NOT_SHOW_THIS_REFERENCE',result)
-        self.assertIn('Account / Handle',render(dict(source_form=['add'],provider=['bluesky'])))
+        self.assertIn('aria-label="Select Bluesky"',render(dict(source_form=['add'],provider=['bluesky'])))
+        self.assertNotIn('Account / Handle',render(dict(source_form=['add'],provider=['bluesky'])))
         x=render(dict(edit_source=['x:123']))
-        self.assertIn('Account / User ID',x);self.assertIn('X page size (5–100)',x)
+        self.assertNotIn('Account / User ID',x);self.assertIn('Posts per request',x)
+        self.assertIn('Advanced settings',x)
         self.assertNotIn('DO_NOT_SHOW_THIS_REFERENCE',x)
 
     def test_multiple_accounts_fetch_by_key_not_platform_priority(self):

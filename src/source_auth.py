@@ -14,7 +14,7 @@ def authentication(source, directory, now=None):
         if not isinstance(grant,dict) or grant.get('revoked'):
             return 'Reconnect required'
         if platform=='bluesky':
-            return 'Authenticated' if grant.get('identity_only') and grant.get('sub')==source.get('account') else 'Reconnect required'
+            return 'Authenticated' if grant.get('identity_only') and grant.get('sub')==source.get('authorized_account',source.get('account')) else 'Reconnect required'
         if ((source.get('error_code')==401 or source.get('error_type')=='ReconnectRequired')
                 and (source.get('last_attempt_at') or 0)>=grant.get('authenticated_at',0)):
             return 'Reconnect required'

@@ -243,6 +243,58 @@ class SocialTests(unittest.TestCase):
         self.assertEqual(runtime.read_config()['sources'][-1]['connection_id'],connection)
         self.assertEqual(len(runtime.read_config()['sources']),2)
 
+    def test_bluesky_handle_authorization_merges_existing_source_and_keeps_settings(self):
+        from src.source_auth import authentication
+        runtime=self.ws.get(self.alice['id']).runtime
+        config=runtime.read_config()
+        config['sources'].append(dict(platform='bluesky',account='fixture.bsky.social',enabled=False,interval_seconds=3600,page_size=7))
+        runtime.save_config(config)
+        original=self.social.http
+        def aliases(method,url,**kwargs):
+            result=original(method,url,**kwargs) if 'identity.resolveHandle?' not in url else (200,{'did':DID},{})
+            if url=='https://plc.directory/'+DID:result[1]['alsoKnownAs']=['at://fixture.bsky.social']
+            return result
+        self.social.http=aliases
+        state,_=self.start(self.a,'bluesky')
+        self.assertEqual(self.callback(self.a,'bluesky',state,iss=BSKY).status_code,303)
+        blue=[s for s in runtime.read_config()['sources'] if s['platform']=='bluesky']
+        self.assertEqual(len(blue),1);self.assertEqual(blue[0]['account'],'fixture.bsky.social')
+        self.assertEqual(blue[0]['authorized_account'],DID)
+        self.assertEqual(blue[0]['page_size'],7);self.assertEqual(blue[0]['interval_seconds'],3600)
+        self.assertEqual(authentication(blue[0],runtime.config_path.parent),'Authenticated')
+        self.assertEqual(runtime.sources()[0].provider.actor,DID)
+
+    def test_remove_and_restore_saved_connection_without_deleting_posts_or_other_tenant(self):
+        state,_=self.start(self.a,'x');self.callback(self.a,'x',state)
+        runtime=self.ws.get(self.alice['id']).runtime
+        token=csrf(self.a.get('/admin'))
+        self.a.post('/announcement',data=dict(csrf=token,text='Keep this announcement'))
+        self.assertEqual(self.b.post('/source-remove',data=dict(csrf=csrf(self.b.get('/admin')),source_key='x:12345')).status_code,400)
+        self.assertEqual(self.a.post('/source-remove',data=dict(csrf='bad',source_key='x:12345')).status_code,403)
+        self.assertEqual(self.a.post('/source-remove',data=dict(csrf=token,source_key='x:12345')).status_code,303)
+        self.assertNotIn('x:12345',[s['platform']+':'+s.get('account','') for s in runtime.read_config()['sources']])
+        self.assertIn(b'Keep this announcement',self.a.get('/admin?view=pending').data)
+        from src.source_connections import choices
+        choice=next(c for c in choices(runtime.read_config(),runtime.config_path.parent) if c['platform']=='x')
+        data=dict(provider='x',connection_ref=choice['connection_ref'],interval_seconds=1800,page_size=5)
+        self.assertEqual(self.b.post('/source-save',data=dict(csrf=csrf(self.b.get('/admin')),**data)).status_code,400)
+        self.assertEqual(self.a.post('/source-save',data=dict(csrf=token,**data)).status_code,303)
+        self.assertFalse(runtime.read_config()['sources'][-1]['enabled'])
+        self.assertEqual(len(self.calls),2)  # Add/remove did not call a provider.
+
+    def test_source_editor_uses_icons_and_server_owned_connected_account(self):
+        html=self.a.get('/admin?view=sources&source_form=add').data.split(b'class="panel source-editor"')[1]
+        for name in ('X','Bluesky','LinkedIn'):
+            self.assertIn(('aria-label="Select '+name+'"').encode(),html)
+        self.assertNotIn(b'Choose provider',html);self.assertNotIn(b'Authenticate Bluesky',html)
+        self.assertNotIn(b'name="account"',html)
+        state,_=self.start(self.a,'x');self.callback(self.a,'x',state)
+        html=self.a.get('/admin?view=sources&edit_source=x%3A12345').data.split(b'class="panel source-editor"')[1]
+        self.assertIn(b'Advanced settings',html);self.assertIn(b'Posts per request',html)
+        self.assertNotIn(b'name="account"',html)
+        self.assertEqual(self.a.post('/source-save',data=dict(csrf=csrf(self.a.get('/admin')),source_key='x:12345',interval_seconds=3600,page_size=5)).status_code,303)
+        self.assertEqual(self.ws.get(self.alice['id']).runtime.read_config()['sources'][-1]['account'],'12345')
+
     def test_legacy_cross_site_callback_restores_exact_original_login(self):
         client=self.app.test_client()
         client.post('/login',data=dict(csrf=csrf(client.get('/login')),password='admin'))

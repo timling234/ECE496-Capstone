@@ -44,6 +44,8 @@ def load_sources(path):
             provider = XProvider(item["account"], token_file=token_path, page_size=item.get("page_size", 5), token_getter=token_getter)
         elif platform == "bluesky":
             provider = BlueskyProvider(item["account"], page_size=item.get("page_size", 5))
+            if item.get("authorized_account"):
+                provider.actor = item["authorized_account"]
         else:
             raise ValueError("Unsupported provider")
         sources.append(PollingSource(provider, item.get("interval_seconds"), enabled))

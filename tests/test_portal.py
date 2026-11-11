@@ -100,9 +100,28 @@ class PortalTests(unittest.TestCase):
         # No original administrator X bearer credential is borrowed by new accounts.
         self.assertEqual(self.post(self.a, '/source-save', dict(provider='x',account='123',interval_seconds='1800',page_size='5')).status_code, 400)
         self.assertEqual(self.post(self.a, '/notifications', dict(enabled='on',channel='email',recipient='victim@example.com')).status_code, 403)
-        self.assertEqual(self.post(self.a, '/source-save', dict(provider='bluesky',account='alice.bsky.social',interval_seconds='1800',page_size='5')).status_code, 303)
+        self.assertEqual(self.post(self.a, '/source-save', dict(provider='bluesky',account='alice.bsky.social',interval_seconds='1800',page_size='5')).status_code, 400)
         self.assertNotIn(b'alice.bsky.social', self.b.get('/admin?view=sources').data)
         self.assertFalse(any(s.get('enabled') for s in self.workspaces.get(alice['id']).runtime.read_config()['sources']))
+
+    def test_ai_review_endpoint_uses_current_workspace_and_csrf(self):
+        alice=self.register(self.a,'alice@example.com');self.register(self.b,'bob@example.com')
+        self.post(self.a,'/announcement',dict(text='Date: November 11, 2026. Alice private event'))
+        with closing(sqlite3.connect(self.workspaces.get(alice['id']).db)) as conn:
+            post_id=conn.execute('SELECT post_id FROM posts').fetchone()[0]
+        reviewer=self.app.extensions['reviewer']
+        reviewer.model=Mock(ready=True,model='fixture')
+        reviewer.model.review.return_value=dict(recommendation='approve',reason='Clear local event.')
+        data=dict(platform='manual',post_id=post_id)
+        self.assertEqual(self.app.test_client().post('/llm/suggest',data=data).status_code,403)
+        self.assertEqual(self.a.post('/llm/suggest',data=dict(csrf='bad',**data)).status_code,403)
+        self.assertEqual(self.post(self.b,'/llm/suggest',data).status_code,400)
+        reviewer.model.review.assert_not_called()
+        self.assertEqual(self.post(self.a,'/llm/suggest',data).status_code,303)
+        self.assertTrue(reviewer.slot.acquire(timeout=3));reviewer.slot.release()
+        self.assertIn(b'AI suggestion: Approve',self.a.get('/admin?view=pending').data)
+        self.assertNotIn(b'Clear local event.',self.b.get('/admin?view=pending').data)
+        self.assertNotIn(b'Alice private event',self.a.get('/u/'+alice['id']+'/feed').data)
 
     def test_legacy_admin_and_public_feed_compatibility(self):
         client = self.app.test_client()

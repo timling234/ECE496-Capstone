@@ -52,6 +52,19 @@ class AppRuntime:
                 tmp.unlink(missing_ok=True)
         self.wake.set()
 
+    def remove_source(self,key):
+        from .source_config import find_source
+        from .source_connections import remember
+        # Finish an active fetch before acknowledging removal; queued fetches
+        # for a removed key will be discarded by the worker.
+        with self.poll_lock, self.lock:
+            config=self.read_config();source=find_source(config,key)
+            if source is None:raise ValueError('Source not found')
+            remember(source,self.config_path.parent)
+            config['sources'].remove(source)
+            self.save_config(config)
+            self.pending.discard(key)
+
     def sources(self):
         with self.lock:return self.loader(self.config_path)
 
@@ -139,7 +152,8 @@ class AppRuntime:
             try:
                 while not self.commands.empty():
                     platform=self.commands.get_nowait()
-                    try:self.fetch_now(platform)
+                    try:
+                        if any(s.provider.key==platform for s in self.sources()):self.fetch_now(platform)
                     finally:
                         with self.lock:self.pending.discard(platform)
                 if not self.stop_event.is_set():

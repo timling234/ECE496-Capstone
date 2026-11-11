@@ -6,18 +6,33 @@ from .source_config import identity as source_identity, find_source
 from .dev_tools import TESTS, LIVE, credentials
 
 STYLE="""
+.ai-suggestion{background:#f1f6fb;border-left:3px solid #7397c4;padding:10px;margin:12px 0}
+
+.provider-picker{display:flex;gap:12px;margin:16px 0}.provider-option{display:flex;align-items:center;gap:9px;padding:12px 18px;border:1px solid #ccd5df;border-radius:6px;text-decoration:none;background:#f8fafc}.provider-option.selected{background:#e4eef8;border:2px solid #2e63a5;padding:11px 17px}.source-editor>form{display:block}
+
 body{max-width:none;margin:0;padding:0;font:14px system-ui;background:#edf0f3;color:#253240}
 h1{font-size:21px;margin:0}h2{font-size:17px;margin:0 0 12px}h3{font-size:15px}header{background:#192b3d;color:white;padding:16px 24px;display:flex;justify-content:space-between;align-items:center}
 .layout{display:grid;grid-template-columns:205px 1fr;min-height:calc(100vh - 58px)}aside{background:#23394d;padding:16px 0}aside a{display:block;color:#dce5ed;text-decoration:none;padding:11px 20px}aside a.active{background:#315875;border-left:3px solid #80bded;padding-left:17px}main{padding:20px;min-width:0}a{color:#205a8b}article,.panel{border:1px solid #ccd5df;border-radius:4px;background:white;padding:14px;margin:0 0 14px}article p{margin:8px 0}table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;background:#f2f5f7;color:#4c5d6d}th,td{padding:9px;border-bottom:1px solid #dde3e9;vertical-align:top}button{font-size:12px;padding:7px 11px;background:#2d628c;border-radius:3px}form{margin:3px;display:inline-block}input,textarea{font:13px system-ui;padding:6px;max-width:100%;box-sizing:border-box}input[type=number]{width:100px}textarea{width:460px}small{font-size:12px;color:#5b6c7e}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#172b3d;color:#d9e5ee;padding:12px;max-height:340px;overflow:auto}.badge{display:inline-block;padding:3px 7px;background:#e1e7ee;border-radius:3px;font-size:12px;font-weight:600}.good{background:#d8eee0;color:#21613d}.bad{background:#f8dfe0;color:#93272d}.warn{background:#fff0cf;color:#865c0c}.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}.metric{background:white;border:1px solid #ccd5df;padding:12px}.metric strong{display:block;font-size:23px;margin-top:4px}.notice{padding:10px;background:#fff0cf;border-left:3px solid #b88a29;margin-bottom:14px}.row{display:flex;gap:14px;flex-wrap:wrap}.content{white-space:pre-wrap;overflow-wrap:anywhere}.post-status{float:right;margin-left:12px}article{position:relative}.duplicate-group{border:1px solid #d4aa45;border-left:5px solid #d4aa45;background:#fff7df;padding:12px;margin:12px 0 20px}.duplicate-group h3{color:#785414;margin:0 0 12px}.duplicate-group article:last-child{margin-bottom:0}.source-details{font-size:12px;margin-top:8px}.section-heading{display:flex;justify-content:space-between;align-items:center;gap:12px}.source-editor{border-left:4px solid #315875}.source-editor label{display:block;margin:12px 0}.source-editor input[type=text]{width:360px}.review-filters{display:flex;gap:15px;align-items:center}.empty-duplicates{background:#e8f3eb;padding:12px;margin:12px 0}.nav-spacer{margin-top:16px}img{max-width:100%;max-height:180px}@media(max-width:850px){.layout{grid-template-columns:1fr}aside{display:flex;flex-wrap:wrap;padding:0}aside a{padding:9px}.metrics{grid-template-columns:repeat(2,1fr)}main{padding:10px}.scroll{overflow:auto}}
 """
 
 
+def provider_icon(platform):
+    if platform=='x':
+        shape='<path d="M5 3h4l10 18h-4L5 3zm-2 18L19 3h2L5 21H3z" fill="currentColor"/>'
+    elif platform=='linkedin':
+        shape='<rect width="24" height="24" rx="4" fill="currentColor"/><text x="4" y="18" font-family="Arial" font-weight="bold" font-size="17" fill="white">in</text>'
+    else:
+        shape='<path d="M12 11C7 2 1 1 2 8c0 4 4 5 8 5-7 0-7 7-3 8 3 1 4-3 5-6 1 3 2 7 5 6 4-1 4-8-3-8 4 0 8-1 8-5 1-7-5-6-10 3z" fill="currentColor"/>'
+    return '<svg viewBox="0 0 24 24" width="25" height="25" aria-hidden="true">'+shape+'</svg>'
+
+
 def stamp(value):
     return datetime.fromtimestamp(value,timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC') if value is not None else 'Never'
 
 
-def render_console(posts,history,settings,config,session,view,esc,card,runtime=None,devtools=None,notice='',query=None,notification_config=None,notification_state=None,feed_url=None):
+def render_console(posts,history,settings,config,session,view,esc,card,runtime=None,devtools=None,notice='',query=None,notification_config=None,notification_state=None,feed_url=None,connection_choices=None):
     query=query or {}
+    connection_choices=connection_choices or []
     csrf=session['csrf']
     def form(route,fields,label,disabled=False):
         return '<form method="post" action="'+route+'"><input type="hidden" name="csrf" value="'+csrf+'">'+''.join('<input type="hidden" name="'+esc(k)+'" value="'+esc(v)+'">' for k,v in fields.items())+'<button'+(' disabled' if disabled else '')+'>'+esc(label)+'</button></form>'
@@ -43,7 +58,7 @@ def render_console(posts,history,settings,config,session,view,esc,card,runtime=N
         body+='<p><a href="/admin?view=sources">Source configuration & live fetch status</a> · <a href="/admin?view=pending">Pending / Needs Review</a></p></section>'
         body+='<section class="panel"><h2>Recent editorial actions</h2><table><tr><th>Action</th><th>Source</th><th>Actor</th><th>Time</th></tr>'+''.join('<tr><td>'+esc(row[0])+'</td><td>'+esc(row[1])+' · '+esc(row[2])+'</td><td>'+esc(row[3])+'</td><td>'+esc(row[4])+'</td></tr>' for row in history)+'</table></section>'
     elif view=='sources':
-        body+='<section class="panel"><p>'+form('/x/connect',{},'Authenticate X')+form('/bluesky/connect',{},'Authenticate Bluesky')+'</p><div class="section-heading"><h2>Sources</h2><a class="badge" href="/admin?view=sources&amp;source_form=add">+ Add Source</a></div><p><small>Fetch Now makes a live request even for a disabled source. Rate-limit cooldowns remain enforced. Times are UTC.</small></p><div class="scroll"><table><tr><th>Provider / account</th><th>Authentication / status</th><th>Polling</th><th>Last fetch / success</th><th>Result</th><th>Error / next due</th><th>Actions</th></tr>'
+        body+='<section class="panel"><p>'+form('/x/connect',{},'Authenticate X')+form('/bluesky/connect',{},'Authenticate Bluesky')+form('/linkedin/connect',{},'Authenticate LinkedIn')+'</p><div class="section-heading"><h2>Sources</h2><a class="badge" href="/admin?view=sources&amp;source_form=add">+ Add Source</a></div><p><small>Fetch Now makes a live request even for a disabled source. Rate-limit cooldowns remain enforced. Remove stops retrieval and keeps existing posts. Times are UTC.</small></p><div class="scroll"><table><tr><th>Provider / account</th><th>Authentication / status</th><th>Polling</th><th>Last fetch / success</th><th>Result</th><th>Error / next due</th><th>Actions</th></tr>'
         for s in sources:
             platform=s['platform']; key=source_identity(s); code=s.get('error_code')
             error=(('HTTP '+str(code)+' · ') if code else '')+s.get('error_type','') if s.get('error_type') else '—'
@@ -52,6 +67,7 @@ def render_console(posts,history,settings,config,session,view,esc,card,runtime=N
             if friendly:error+=' · '+friendly
             actions=(form('/fetch',{'source_key':key},'Fetch Now')+form('/source-toggle',{'source_key':key},'Disable' if s.get('enabled') else 'Enable')) if platform!='linkedin' or s.get('connection_id') else ''
             actions+=form('/'+platform+'/connect',{},'Re-authenticate' if s.get('authentication')=='Authenticated' else 'Authenticate')
+            actions+=form('/source-remove',{'source_key':key},'Remove')
             body+='<tr><td><a aria-label="Edit '+esc(platform)+' '+esc(s.get('account',''))+'" href="/admin?view=sources&amp;edit_source='+quote(key,safe='')+'">✎</a> <b>'+esc(platform)+'</b><br><small>'+esc(s.get('label') or s.get('account') or 'Connect a Page')+'</small></td><td>'+badge(s.get('authentication','Public access' if platform=='bluesky' else 'Not authenticated'))+'<br><small>'+esc(s['status'])+'</small></td><td>'+('Enabled' if s.get('enabled') else 'Disabled')+'<br>'+esc(s.get('interval_seconds') or 1800)+' sec</td><td>'+esc(stamp(s.get('last_attempt_at')))+'<br><small>Success: '+esc(stamp(s.get('last_success_at')))+'</small></td><td>'+str(s.get('fetched_count',0))+' fetched / '+str(s.get('new_count',0))+' new</td><td>'+esc(error)+'<br><small>'+esc(stamp(s.get('next_poll_at')) if s.get('next_poll_at') else '—')+'</small></td><td>'+actions+'</td></tr>'
         body+='</table></div></section>'
         edit_key=query.get('edit_source',[''])[0]
@@ -63,24 +79,29 @@ def render_console(posts,history,settings,config,session,view,esc,card,runtime=N
             else:
                 platform=source['platform'] if source else query.get('provider',['bluesky'])[0]
                 if platform not in ('x','bluesky','linkedin'):platform='bluesky'
-                source=source or dict(platform=platform,account='',interval_seconds=1800,enabled=False,page_size=5)
                 body+='<section class="panel source-editor"><h2>'+('Edit Source' if edit_key else 'Add Source')+'</h2>'
                 if adding:
-                    body+='<form method="get" action="/admin"><input type="hidden" name="view" value="sources"><input type="hidden" name="source_form" value="add"><label>Provider <select name="provider" aria-label="Provider">'+''.join('<option value="'+v+'" '+('selected' if v==platform else '')+'>'+label+'</option>' for v,label in [('bluesky','Bluesky'),('x','X'),('linkedin','LinkedIn')])+'</select></label><button>Choose provider</button></form>'
-                else:body+='<p>Provider: <b>'+esc(platform)+'</b></p>'
-                if platform in ('x','bluesky'):
-                    body+='<p>'+form('/'+platform+'/connect',{},'Authenticate '+('X' if platform=='x' else 'Bluesky'))+'</p>'
-                if platform=='linkedin':
-                    body+='<p>Connect the LinkedIn account that administers your organization Page. Personal post retrieval is not supported. Authenticate on LinkedIn, approve access, then choose the Page to fetch from.</p>'+form('/linkedin/connect',{},'Authenticate')
-                    if not source.get('connection_id'):
-                        body+='</section></main></div>'
-                        return body
-                body+='<form method="post" action="/source-save"><input type="hidden" name="csrf" value="'+csrf+'"><input type="hidden" name="provider" value="'+platform+'"><input type="hidden" name="source_key" value="'+esc(edit_key)+'">'
-                label='Account / Handle' if platform=='bluesky' else 'Account / User ID' if platform=='x' else 'Organization ID'
-                body+='<label>'+label+' <input type="text" name="account" value="'+esc(source.get('account'))+'" '+('readonly' if source.get('connection_id') else 'required')+'></label><label>Polling interval <input type="number" name="interval_seconds" min="'+('1800' if platform=='linkedin' else '1')+'" max="31536000" value="'+str(source.get('interval_seconds') or 1800)+'"> seconds</label>'
-                body+='<label><input type="checkbox" name="enabled" '+('checked' if source.get('enabled') else '')+' '+''+'>Enabled</label>'
-                body+='<label>'+('X page size (5–100)' if platform=='x' else 'LinkedIn page size (1–100)' if platform=='linkedin' else 'Bluesky page size (1–100)')+' <input type="number" name="page_size" min="'+('5' if platform=='x' else '1')+'" max="100" value="'+str(source.get('page_size',5))+'"></label>'
-                body+='<p><small>'+('Authenticate X to connect your account. Credentials stay on the server.' if platform=='x' else 'LinkedIn pulls one recent page per fetch. Automatic polling is optional (minimum 30 minutes). LinkedIn posts use the same manual approval flow as other sources.' if platform=='linkedin' else 'Public author-feed retrieval; no posting credentials are inferred from this source.')+'</small></p><a href="/admin?view=sources">Cancel</a> <button>'+('Save Source' if edit_key else 'Add Source')+'</button></form></section>'
+                    body+='<div class="provider-picker" role="group" aria-label="Provider">'
+                    for provider,label in [('x','X'),('bluesky','Bluesky'),('linkedin','LinkedIn')]:
+                        body+='<a class="provider-option '+('selected' if provider==platform else '')+'" aria-label="Select '+label+'" '+('aria-current="true" ' if provider==platform else '')+'href="/admin?view=sources&amp;source_form=add&amp;provider='+provider+'">'+provider_icon(provider)+'<span>'+label+'</span></a>'
+                    body+='</div>'
+                else:body+='<p>'+provider_icon(platform)+' '+esc(platform.title() if platform!='x' else 'X')+'</p>'
+                available=[c for c in connection_choices if c['platform']==platform and not find_source(config,source_identity(c))]
+                if adding and not available:
+                    body+='<p>No additional connected account for this platform. Connect another account using the controls above, or edit an existing source.</p><a href="/admin?view=sources">Back to Sources</a></section>'
+                else:
+                    source=source or dict(platform=platform,interval_seconds=1800,enabled=False,page_size=5)
+                    body+='<form method="post" action="/source-save"><input type="hidden" name="csrf" value="'+csrf+'"><input type="hidden" name="provider" value="'+platform+'"><input type="hidden" name="source_key" value="'+esc(edit_key)+'">'
+                    if adding:
+                        if len(available)==1:
+                            choice=available[0]
+                            body+='<p>Connected account: <b>'+esc(choice.get('label') or choice['account'])+'</b></p><input type="hidden" name="connection_ref" value="'+esc(choice['connection_ref'])+'">'
+                        else:
+                            body+='<label>Connected account <select name="connection_ref" required>'+''.join('<option value="'+esc(c['connection_ref'])+'">'+esc(c.get('label') or c['account'])+'</option>' for c in available)+'</select></label>'
+                    else:body+='<p>Connected account: <b>'+esc(source.get('label') or source.get('account'))+'</b></p>'
+                    body+='<label>Polling interval <input type="number" name="interval_seconds" min="'+('1800' if platform=='linkedin' else '1')+'" max="31536000" value="'+str(source.get('interval_seconds') or 1800)+'"> seconds</label><label><input type="checkbox" name="enabled" '+('checked' if source.get('enabled') else '')+'>Automatic polling</label>'
+                    body+='<details><summary>Advanced settings</summary><label>Posts per request <input type="number" name="page_size" min="'+('5' if platform=='x' else '1')+'" max="100" value="'+str(source.get('page_size',5))+'"></label><p><small>Maximum posts returned by one provider request. Larger values read more data. This does not control the number shown on your website. Catch-up fetching may use multiple requests.</small></p></details>'
+                    body+='<a href="/admin?view=sources">Cancel</a> <button>'+('Save Source' if edit_key else 'Add Source')+'</button></form></section>'
     elif view=='testing':
         if not devtools or not devtools.enabled:body+='<section class="panel"><h2>Development tools disabled</h2><p>Enable locally with ASAP_DEV_TOOLS=1. Production default is disabled.</p></section>'
         else:

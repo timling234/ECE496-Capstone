@@ -94,7 +94,7 @@ class BlueskyProvider(Provider):
 
     # FR-1: Public author-feed pagination until the previous observed boundary
     def fetch(self, checkpoint):
-        params = {"actor": self.account, "limit": self.page_size, "includePins": "false"}
+        params = {"actor": getattr(self,"actor",self.account), "limit": self.page_size, "includePins": "false"}
         posts, visited, newest = [], set(), None
         while True:
             payload = self.transport("https://public.api.bsky.app/xrpc/app.bsky.feed.getAuthorFeed?" + urlencode(params))

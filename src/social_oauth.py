@@ -21,6 +21,7 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.asymmetric.utils import decode_dss_signature
 from .linkedin import Credentials, ReconnectRequired
+from .source_connections import merge_bluesky, remember
 
 LOCK = threading.RLock()
 X_SCOPES = 'tweet.read users.read offline.access'
@@ -246,9 +247,13 @@ class SocialOAuth:
             metadata = require_ok(self.http('GET',BSKY+'/.well-known/oauth-authorization-server'))
             if metadata.get('issuer')!=BSKY:
                 raise ValueError('Bluesky issuer metadata did not match')
-            label = account
+            handle=next((a[5:] for a in doc.get('alsoKnownAs',[]) if isinstance(a,str) and re.fullmatch(r'at://[a-z0-9.-]+',a)),None)
+            if handle:
+                resolved=require_ok(self.http('GET',BSKY+'/xrpc/com.atproto.identity.resolveHandle?'+urlencode({'handle':handle})))
+                if resolved.get('did')!=account:raise ValueError('Bluesky handle did not match the authorized identity')
+            label = handle or account
             # Identity-only auth ends here. No need to retain access/refresh tokens.
-            payload = dict(sub=account, authenticated_at=self.clock(), scope='atproto', identity_only=True)
+            payload = dict(sub=account, authenticated_at=self.clock(), scope='atproto', identity_only=True, aliases=[handle] if handle else [])
             credentials = Credentials(pending['workspace'].db.parent/'bluesky_credentials')
         runtime = pending['workspace'].runtime
         if not runtime:
@@ -256,6 +261,9 @@ class SocialOAuth:
         with runtime.lock:
             config = runtime.read_config()
             source = next((s for s in config['sources'] if s['platform']==platform and s.get('account')==account),None)
+            if platform=='bluesky' and handle:
+                old=next((s for s in config['sources'] if s['platform']==platform and s.get('account')==handle),None)
+                source=old or source
             connection = source.get('connection_id') if source else None
             connection = connection or secrets.token_hex(16)
             credentials.save(connection,payload)
@@ -263,5 +271,8 @@ class SocialOAuth:
                 source = dict(platform=platform,account=account,enabled=False,interval_seconds=1800,page_size=5)
                 config['sources'].append(source)
             source.update(connection_id=connection,label=label)
+            if platform=='bluesky':
+                source=merge_bluesky(config,account,handle,connection) or source
+            remember(source,runtime.config_path.parent)
             runtime.save_config(config)
         return source

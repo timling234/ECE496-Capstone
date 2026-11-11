@@ -23,6 +23,7 @@ from .web_app import make_handler, page, esc
 from .workspaces import Workspace, Workspaces
 from .portal_ui import auth_page, home_page
 from .social_oauth import SocialOAuth
+from .review_ai import Reviewer
 
 COOKIE = 'asap_portal'
 
@@ -41,11 +42,15 @@ def create_app(db, password, runtime=None, *, start_workers=False, google=None, 
     workspaces = Workspaces(db.parent / 'workspaces', accounts, default, start_workers)
     handler_class = make_handler(db, password, port=5000, runtime=runtime, linkedin_oauth=default.oauth)
     social = SocialOAuth()
+    reviewer = Reviewer()
     legacy_sessions = {}
     cache_lock = threading.RLock()
-    app.extensions.update(accounts=accounts, workspaces=workspaces, google=google, social=social)
+    app.extensions.update(accounts=accounts, workspaces=workspaces, google=google, social=social,reviewer=reviewer)
     if start_workers:
         workspaces.restore()
+
+    for workspace in [default]+[workspaces.get(uid) for uid in accounts.ids()]:
+        reviewer.recover(workspace.db)
 
     def document(title, body, status=200):
         nav = '<nav><a href="/">ASAP</a>'
@@ -225,6 +230,7 @@ def create_app(db, password, runtime=None, *, start_workers=False, google=None, 
             self.db, self.runtime, self.linkedin_oauth = workspace.db, workspace.runtime, workspace.oauth
             self.config_path = workspace.runtime.config_path if workspace.runtime else workspace.db.parent / 'polling.local.json'
             self.devtools = None
+            self.ai_ready = reviewer.model.ready
             self.feed_url = request.host_url.rstrip('/') + ('/u/'+g.user['id']+'/feed' if g.user else '/feed')
             self.path = request.full_path.rstrip('?')
             self.headers = request.headers
@@ -243,6 +249,21 @@ def create_app(db, password, runtime=None, *, start_workers=False, google=None, 
             if cookie:
                 self.response.headers.add('Set-Cookie', cookie)
             return self.response
+
+    @app.post('/llm/suggest')
+    def ai_suggest():
+        workspace=workspaces.get(g.user['id']) if g.user else default
+        session=Adapter(workspace).session()
+        if not session or not session.get('authenticated'):
+            abort(403)
+        if not secrets.compare_digest(request.form.get('csrf',''),session['csrf']):
+            abort(403)
+        throttle('ai-review:'+str(g.user['id'] if g.user else 'admin'),3,60)
+        try:
+            reviewer.submit(workspace.db,request.form.get('platform',''),request.form.get('post_id',''),g.user['id'] if g.user else 'admin')
+            return redirect('/admin?view=pending&notice=AI+review+requested.+Refresh+results+to+see+the+suggestion.',303)
+        except ValueError as exc:
+            return document('AI review unavailable','<p>'+esc(exc)+'</p><a href="/admin?view=pending">Back to review queue</a>',400)
 
     @app.get('/bluesky/client-metadata.json')
     def bluesky_client_metadata():
