@@ -17,7 +17,7 @@ from .console_ui import render_console, STYLE
 from .dev_tools import DevTools
 from . import notifications
 from .feed_ui import feed_body, mock_body
-from .source_config import configure_source, find_source, identity
+from .source_config import configure_source, find_source, identity, add_platform
 from .source_connections import choices
 from .linkedin import OAuth, Credentials
 from .web_editorial import initialize, items, decide, publishable, create_announcement, edit_announcement, set_order, presentation, save_presentation
@@ -237,6 +237,7 @@ def make_handler(db,password,host='127.0.0.1',port=5000,runtime=None,dev_enabled
                             config['sources'].append(source)
                         source.update(connection_id=choice['connection'],label=choice['pages'][account],
                                       enabled=False,interval_seconds=1800,page_size=100)
+                        config['sources']=[s for s in config['sources'] if not (s['platform']=='linkedin' and not s.get('account'))]
                         self.runtime.save_config(config)
                         session.pop('linkedin_choice',None)
                     return self.redirect('/admin?view=sources&notice=LinkedIn+Page+connected.+Use+Fetch+Now+when+ready.')
@@ -266,6 +267,15 @@ def make_handler(db,password,host='127.0.0.1',port=5000,runtime=None,dev_enabled
                         self.runtime.save_config(config)
                     return self.redirect('/admin?view=sources')
                 except ValueError as exc:return self.send(400,page('Operation unavailable',esc(exc)))
+            if route=='/source-add':
+                try:
+                    if not self.runtime:raise ValueError('Source runtime required')
+                    with self.runtime.lock:
+                        config=self.read_config()
+                        add_platform(config,value('provider'))
+                        self.runtime.save_config(config)
+                    return self.redirect('/admin?view=sources')
+                except ValueError as exc:return self.send(400,page('Cannot add source',esc(exc)))
             if route=='/source-remove':
                 try:
                     if not self.runtime:raise ValueError('Source runtime required')
@@ -281,15 +291,15 @@ def make_handler(db,password,host='127.0.0.1',port=5000,runtime=None,dev_enabled
                         fields={k:value(k) for k in ('provider','account','interval_seconds','enabled','page_size')}
                         if key:
                             if existing is None:raise ValueError('Source not found')
-                            if value('account') and value('account')!=existing['account']:raise ValueError('Connected account cannot be changed')
-                            fields['account']=existing['account']
+                            if value('account') and value('account')!=existing.get('account',''):raise ValueError('Connected account cannot be changed')
+                            fields['account']=existing.get('account','')
                         else:
                             selected=next((s for s in choices(config,self.config_path.parent) if s['platform']==value('provider') and s['connection_ref']==value('connection_ref')),None)
                             if not selected:raise ValueError('Authenticate an account from Sources first')
                             if find_source(config,identity(selected)):raise ValueError('This account is already in Sources; edit its settings instead')
                             existing={k:v for k,v in selected.items() if k!='connection_ref'}
                             config['sources'].append(existing);key=identity(existing)
-                            fields['account']=existing['account']
+                            fields['account']=existing.get('account','')
                         configure_source(config,fields,key)
                         self.runtime.save_config(config)
                 except ValueError as exc:return self.send(400,page('Invalid source configuration',esc(exc)))

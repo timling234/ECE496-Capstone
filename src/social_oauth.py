@@ -264,12 +264,18 @@ class SocialOAuth:
             if platform=='bluesky' and handle:
                 old=next((s for s in config['sources'] if s['platform']==platform and s.get('account')==handle),None)
                 source=old or source
+            if source is None:
+                source=next((s for s in config['sources'] if s['platform']==platform and s.get('draft')),None)
             connection = source.get('connection_id') if source else None
             connection = connection or secrets.token_hex(16)
             credentials.save(connection,payload)
             if source is None:
                 source = dict(platform=platform,account=account,enabled=False,interval_seconds=1800,page_size=5)
                 config['sources'].append(source)
+            # Consume a draft even when reauth resolves to an existing account.
+            config['sources']=[s for s in config['sources'] if not (s['platform']==platform and s.get('draft') and s is not source)]
+            source.pop('draft',None)
+            if not source.get('account'):source['account']=account
             source.update(connection_id=connection,label=label)
             if platform=='bluesky':
                 source=merge_bluesky(config,account,handle,connection) or source

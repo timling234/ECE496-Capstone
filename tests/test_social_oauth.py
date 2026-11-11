@@ -295,6 +295,39 @@ class SocialTests(unittest.TestCase):
         self.assertEqual(self.a.post('/source-save',data=dict(csrf=csrf(self.a.get('/admin')),source_key='x:12345',interval_seconds=3600,page_size=5)).status_code,303)
         self.assertEqual(self.ws.get(self.alice['id']).runtime.read_config()['sources'][-1]['account'],'12345')
 
+    def test_provider_selection_adds_disabled_draft_and_authentication_is_row_only(self):
+        runtime=self.ws.get(self.alice['id']).runtime
+        runtime.save_config({'sources':[]})
+        for platform in ('linkedin','x','bluesky'):
+            for _ in range(2):
+                response=self.a.post('/source-add',data=dict(csrf=csrf(self.a.get('/admin')),provider=platform))
+                self.assertEqual(response.status_code,303)
+        config=runtime.read_config()
+        self.assertEqual(len(config['sources']),3)
+        self.assertTrue(all(s['draft'] and not s['enabled'] and not s['account'] for s in config['sources']))
+        self.assertEqual(runtime.sources(),[]);self.assertEqual(self.calls,[])
+        html=self.a.get('/admin?view=sources').data
+        self.assertNotIn(b'Authenticate X',html);self.assertNotIn(b'Authenticate Bluesky',html);self.assertNotIn(b'Authenticate LinkedIn',html)
+        self.assertEqual(html.count(b'<button>Authenticate</button>'),3)
+        self.assertNotIn(b'<button>Fetch Now</button>',html)
+        self.assertIn(b'action="/source-add"',self.a.get('/admin?view=sources&source_form=add').data)
+        self.assertEqual(self.a.post('/source-add',data=dict(csrf='bad',provider='x')).status_code,403)
+        self.assertEqual(self.post_draft_toggle(self.a,'x:'),400)
+        state,_=self.start(self.a,'x')
+        self.assertEqual(self.callback(self.a,'x',state).status_code,303)
+        xs=[s for s in runtime.read_config()['sources'] if s['platform']=='x']
+        self.assertEqual(len(xs),1);self.assertNotIn('draft',xs[0]);self.assertEqual(xs[0]['account'],'12345')
+        self.assertFalse(xs[0]['enabled'])
+
+    def post_draft_toggle(self,client,key):
+        return client.post('/source-toggle',data=dict(csrf=csrf(client.get('/admin')),source_key=key)).status_code
+
+    def test_draft_in_one_workspace_does_not_add_source_in_another(self):
+        self.a.post('/source-add',data=dict(csrf=csrf(self.a.get('/admin')),provider='bluesky'))
+        self.assertFalse(any(s['platform']=='bluesky' for s in self.ws.get(self.bob['id']).runtime.read_config()['sources']))
+        self.assertEqual(self.b.post('/source-add',data=dict(csrf=csrf(self.b.get('/admin')),provider='bad')).status_code,400)
+        self.assertEqual(self.b.post('/source-remove',data=dict(csrf=csrf(self.b.get('/admin')),source_key='bluesky:')).status_code,400)
+
     def test_legacy_cross_site_callback_restores_exact_original_login(self):
         client=self.app.test_client()
         client.post('/login',data=dict(csrf=csrf(client.get('/login')),password='admin'))

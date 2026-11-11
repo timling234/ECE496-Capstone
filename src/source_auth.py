@@ -6,6 +6,7 @@ from .linkedin import Credentials
 def authentication(source, directory, now=None):
     now=time.time() if now is None else now
     platform=source['platform']
+    if source.get('draft'):return 'Not authenticated'
     connection=source.get('connection_id')
     if not connection:
         return 'Public access' if platform=='bluesky' else 'Not authenticated'

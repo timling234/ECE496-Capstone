@@ -112,3 +112,19 @@ retains its old key/settings/checkpoint while `authorized_account` pins retrieva
 to the verified DID. This prevents a handle and DID becoming two sources. An
 already-created duplicate was repaired with one identity lookup, preserving all
 posts and the original polling state.
+
+
+## Provider-first source creation (current flow)
+
+Clicking a platform icon submits a CSRF-protected POST to `/source-add`, creates
+one disabled, unauthenticated source draft, and returns directly to Sources. A
+second click reuses that platform's pending draft. GETs never create sources.
+Authenticate is the last action on each source row; there are no global
+Authenticate buttons or additional account-selection steps in Add Source.
+
+Drafts contain no account or credentials, are skipped by the worker, and cannot
+be enabled or fetched. Successful OAuth consumes the draft and binds the verified
+account; choosing an already-connected account reuses its row rather than making
+a duplicate. New LinkedIn workspaces' original placeholder is reused. Source edits
+keep the settings-only form. The older saved-grant restore endpoint remains
+server-validated, but it is no longer a prerequisite to adding a platform row.

@@ -20,6 +20,10 @@ def load_sources(path):
     for item in config["sources"]:
         platform = item["platform"]
         enabled = item.get("enabled", False)
+        if item.get("draft"):
+            if enabled or item.get("account") or item.get("connection_id"):
+                raise ValueError("Authenticate a draft source before enabling retrieval")
+            continue
         if platform == "linkedin":
             if not item.get("account") or not item.get("connection_id"):
                 if enabled: raise ValueError("Connect a LinkedIn Page before enabling it")

@@ -24,6 +24,13 @@ def configure_source(config, fields, key=None):
     interval=int(fields.get('interval_seconds') or 1800)
     if not 1<=interval<=31536000:raise ValueError('Interval must be 1–31536000 seconds')
     page_size=int(fields.get('page_size') or (existing or {}).get('page_size',5))
+    if existing and existing.get('draft'):
+        if enabled:raise ValueError('Authenticate this source before enabling retrieval')
+        if account:raise ValueError('Authenticate to select this source account')
+        if not (5 if platform=='x' else 1)<=page_size<=100:raise ValueError('Invalid posts per request')
+        if platform=='linkedin' and interval<1800:raise ValueError('LinkedIn polling must be at least 1800 seconds')
+        existing.update(enabled=False,interval_seconds=interval,page_size=page_size)
+        return existing
     if platform=='linkedin':
         if not existing or not existing.get('connection_id'):
             raise ValueError('Use Connect LinkedIn to add an authorized Page')
@@ -41,3 +48,16 @@ def configure_source(config, fields, key=None):
     if existing:existing.clear();existing.update(replacement)
     else:config['sources'].append(replacement)
     return replacement
+
+
+def add_platform(config,platform):
+    """One disabled draft per platform. A provider click is sufficient to add it."""
+    if platform not in ('x','bluesky','linkedin'):
+        raise ValueError('Unsupported provider')
+    draft=next((s for s in config['sources'] if s['platform']==platform and not s.get('account')),None)
+    if draft is None:
+        draft=dict(platform=platform,account='',enabled=False,interval_seconds=1800,page_size=5)
+        config['sources'].append(draft)
+    draft.setdefault('account','')
+    draft.update(draft=True,enabled=False)
+    return draft
