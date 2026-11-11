@@ -65,7 +65,7 @@ class ModelManager:
     def download(self,db,name):
         if name not in CATALOG:raise ValueError('Choose a model from the download list')
         if name in self.installed():return None
-        if not self.download_lock.acquire(blocking=False):raise ValueError('A model download is already running on Jarvis')
+        if not self.download_lock.acquire(blocking=False):raise ValueError('A model download is already running on Server')
         try:
             with closing(sqlite3.connect(db)) as conn:
                 initialize(conn)
@@ -99,5 +99,5 @@ class ModelManager:
                 conn.execute("UPDATE ai_model_downloads SET status='complete',progress=100 WHERE id=?",(job,));conn.commit()
         except Exception:
             with closing(sqlite3.connect(db,timeout=15)) as conn:
-                conn.execute("UPDATE ai_model_downloads SET status='error',error='Download did not complete. Check Jarvis storage/network and retry manually.' WHERE id=?",(job,));conn.commit()
+                conn.execute("UPDATE ai_model_downloads SET status='error',error='Download did not complete. Check Server storage/network and retry manually.' WHERE id=?",(job,));conn.commit()
         finally:self.download_lock.release()

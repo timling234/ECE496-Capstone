@@ -118,13 +118,13 @@ def render_console(posts,history,settings,config,session,view,esc,card,runtime=N
     elif view=='settings':
         if ai_panel:
             ai=ai_panel;cfg=ai['config']
-            body+='<section class="panel source-editor"><h2>Local AI</h2><p>Models run on Jarvis. Model files are shared; your selected model and review rules apply only to your workspace.</p>'
+            body+='<section class="panel source-editor"><h2>Local AI</h2><p>Models run on Server. Model files are shared; your selected model and review rules apply only to your workspace.</p>'
             if ai['error']:body+='<p class="notice">'+esc(ai['error'])+'</p>'
             body+='<form method="post" action="/llm/settings"><input type="hidden" name="csrf" value="'+csrf+'"><label>Installed model <select name="model" required>'
             for name,size in ai['installed'].items():
                 body+='<option value="'+esc(name)+'" '+('selected' if name==cfg['model'] else '')+'>'+esc(name)+' · '+('%.1f GB'%(size/1e9))+'</option>'
             body+='</select></label><p>Applied model: <b>'+esc(cfg['model'])+'</b></p><label>Review policy<textarea name="policy" rows="5" minlength="10" maxlength="4000" required>'+esc(cfg['policy'])+'</textarea></label><label>Posts per batch <input type="number" name="batch_limit" min="1" max="50" value="'+str(cfg['batch_limit'])+'"></label><p>Keep both options off for suggestions only. Approvals publish to your public feed. Automation runs only when you click Run automatic review.</p><label><input type="checkbox" name="auto_approve" '+('checked' if cfg['auto_approve'] else '')+'>Allow automatic approve</label><label><input type="checkbox" name="auto_reject" '+('checked' if cfg['auto_reject'] else '')+'>Allow automatic reject</label><p><small>Duplicate groups are analyzed together. Approving a representative and rejecting alternatives requires both options. Uncertain or changed groups stay for manual review.</small></p><button '+('disabled' if not ai['installed'] else '')+'>Apply model and settings</button></form>'
-            body+='<h3>Download a local model</h3><p>Downloads use Jarvis disk space and internet bandwidth. After completion, choose the model above and apply it.</p><form method="post" action="/llm/download"><input type="hidden" name="csrf" value="'+csrf+'"><select name="model" required>'
+            body+='<h3>Download a local model</h3><p>Downloads use Server disk space and internet bandwidth. After completion, choose the model above and apply it.</p><form method="post" action="/llm/download"><input type="hidden" name="csrf" value="'+csrf+'"><select name="model" required>'
             body+=''.join('<option value="'+esc(name)+'">'+esc(label)+(' · Installed' if name in ai['installed'] else '')+'</option>' for name,label in ai['catalog'].items())+'</select><button>Download</button></form>'
             for name,status,progress,error in ai['downloads']:body+='<p>'+esc(name)+' · '+esc(status)+' · '+str(progress)+'% '+esc(error or '')+'</p>'
             body+='<h3>Automatic review history</h3>'

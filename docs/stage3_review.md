@@ -2,7 +2,7 @@
 
 Settings → Local AI lists installed local Ollama models and a small download catalog.
 Download runs in the background; refresh for progress, then select the installed
-model and Apply. Model files are shared on Jarvis; model selection, editorial
+model and Apply. Model files are shared on the server; model selection, editorial
 policy, action permissions and batch limit belong to each workspace. Cloud models
 are excluded. The operator sets the local service URL in private environment
 configuration; browser requests cannot supply a service URL or arbitrary model tag.
@@ -30,7 +30,7 @@ untrusted model input; the model has no tools, and output is validated and escap
 
 One shared inference slot and one shared download slot bound background activity.
 Authenticated POST routes require CSRF and rate limits. Download tags are
-allowlisted; transport rejects redirects and proxies. Downloads use Jarvis disk
+allowlisted; transport rejects redirects and proxies. Downloads use the server disk
 and bandwidth and are not automatically applied.
 
 Validation used targeted offline checks for workspace isolation, settings,
@@ -42,3 +42,7 @@ no new model was downloaded, and no social API was called for this increment.
 References: [Ollama chat API](https://docs.ollama.com/api/chat),
 [structured output](https://docs.ollama.com/capabilities/structured-outputs),
 [model downloads](https://docs.ollama.com/api/pull).
+
+Deployment note: the current Mac is temporary hosting. Migration of the website,
+workspace databases, credentials and local models to a delivery server is deferred
+until project handover. User-facing wording uses “Server”.
