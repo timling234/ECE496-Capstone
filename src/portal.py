@@ -21,14 +21,14 @@ from .google_login import GoogleLogin
 from .linkedin import Credentials, OAuth
 from .web_app import make_handler, page, esc
 from .workspaces import Workspace, Workspaces
-from .portal_ui import auth_page
+from .portal_ui import auth_page, home_page
 
 COOKIE = 'asap_portal'
 
 
 def create_app(db, password, runtime=None, *, start_workers=False, google=None, secure=None, trust_proxy=False):
     db = Path(db)
-    app = Flask(__name__, static_folder=None)
+    app = Flask(__name__, static_folder=str(Path(__file__).parent/'static'), static_url_path='/assets')
     app.config.update(MAX_CONTENT_LENGTH=16384)
     if trust_proxy:
         # Only enable behind exactly one trusted reverse proxy (Caddy).
@@ -93,7 +93,7 @@ def create_app(db, password, runtime=None, *, start_workers=False, google=None, 
 
     @app.after_request
     def headers(response):
-        response.headers['Cache-Control'] = 'no-store'
+        response.headers['Cache-Control'] = 'public, max-age=86400' if request.endpoint=='static' else 'no-store'
         response.headers['X-Content-Type-Options'] = 'nosniff'
         response.headers['Referrer-Policy'] = 'no-referrer'
         response.headers.setdefault('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; img-src https: http:; form-action 'self' https://www.linkedin.com; base-uri 'none'; frame-src 'self'")
@@ -125,7 +125,7 @@ def create_app(db, password, runtime=None, *, start_workers=False, google=None, 
     def home():
         if g.user:
             return redirect('/app',303)
-        return account_gateway()
+        return Response(home_page(),content_type='text/html; charset=utf-8')
 
     @app.route('/register', methods=['GET', 'POST'])
     @app.route('/signin', methods=['GET', 'POST'])

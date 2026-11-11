@@ -1,31 +1,63 @@
-"""ASAP account gateway: responsive brand panel and focused sign-in form."""
+"""Approved sapphire editorial homepage and matching account forms."""
 from html import escape
+from pathlib import Path
 
-STYLE = '''
-*{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#173b3c}body{background:#fbfcfb}a{color:inherit;text-underline-offset:4px}button,input{font:inherit}.gateway{display:grid;grid-template-columns:1fr 1fr;min-height:100svh}.brand-panel{background:#e9f1ef;padding:40px 48px 28px;display:flex;flex-direction:column;position:relative;overflow:hidden}.brand{display:inline-flex;gap:10px;align-items:center;font-size:24px;font-weight:800;letter-spacing:-1px;text-decoration:none;width:fit-content}.brand-icon{width:26px;height:27px;display:flex;gap:4px;align-items:center}.brand-icon i{width:5px;border-radius:4px;background:#287d79;display:block}.brand-icon i:nth-child(1){height:13px}.brand-icon i:nth-child(2){height:26px}.brand-icon i:nth-child(3){height:19px}.brand-story{margin:auto 0;max-width:540px;padding:64px 0 38px}.eyebrow{font-size:10px;letter-spacing:2.3px;line-height:1.6;text-transform:uppercase;font-weight:750;color:#537e79;margin:0 0 20px}.brand-story h1{font-size:clamp(38px,3.6vw,62px);line-height:1.08;letter-spacing:-2.7px;margin:0 0 24px;font-weight:750}.intro{font-size:15px;color:#536e6b;line-height:1.8;max-width:390px;margin:0}.brand-footer{font-size:11px;color:#5f7975;margin:0;padding-top:24px;line-height:1.6}.feed-scene{margin-top:40px;max-width:390px;position:relative;padding:15px 10px 0 24px}.scene-dot{width:95px;height:95px;border-radius:50%;position:absolute;background:#eed8a9;right:0;top:0}.story-card{position:relative;background:#fbfdfc;border:1px solid #ccddda;border-radius:14px;padding:18px 20px;box-shadow:0 10px 22px #244a4420;max-width:330px}.story-card.back{transform:rotate(-6deg);margin-bottom:-17px;margin-left:-16px;background:#d9e8e3;box-shadow:none;padding:14px 20px}.source-row{display:flex;align-items:center;gap:7px;font-size:10px;color:#5c7672}.source-icon{width:21px;height:21px;border-radius:6px;background:#d9e8e7;color:#276b67;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:750}.story-card h2{font-size:17px;line-height:1.4;letter-spacing:-.4px;margin:14px 0 8px}.story-card p{font-size:11px;color:#657975;line-height:1.6;margin:0}.card-foot{display:flex;justify-content:space-between;align-items:center;margin-top:18px;padding-top:12px;border-top:1px solid #e0eae7;font-size:10px;color:#627a75}.approved{display:inline-flex;align-items:center;gap:5px;color:#287667;background:#e2f0e9;padding:4px 8px;border-radius:20px}.scene-caption{position:relative;font-size:10px;color:#5e7b73;margin:18px 0 0 5px}.auth-panel{display:flex;flex-direction:column;justify-content:center;align-items:center;padding:64px 48px;min-width:0}.auth-box{width:100%;max-width:360px}.auth-box .eyebrow{margin-bottom:12px}.auth-box h2{font-size:29px;line-height:1.2;letter-spacing:-1.1px;margin:0 0 12px}.auth-intro{font-size:13px;color:#60736f;line-height:1.65;margin:0 0 28px}.google-button{width:100%;min-height:47px;border:1px solid #d9e1de;border-radius:8px;background:white;display:flex;align-items:center;justify-content:center;gap:12px;text-decoration:none;font-size:13px;font-weight:650;color:#304b46;padding:12px}.google-mark{font-family:Arial,sans-serif;font-size:20px;font-weight:bold;color:#4285f4}.google-button:disabled{cursor:not-allowed;color:#637570;background:#f7f9f8}.google-note{font-size:11px;line-height:1.5;color:#697973;margin:8px 0 0}.divider{display:flex;align-items:center;gap:13px;font-size:10px;color:#6b7d76;margin:23px 0}.divider:before,.divider:after{content:"";height:1px;background:#e1e7e3;flex:1}.field{display:block;margin-bottom:19px}.field>span{display:block;font-size:12px;font-weight:650;margin-bottom:8px}.field input{display:block;width:100%;min-height:46px;border:1px solid #d6e0dc;border-radius:7px;background:#fff;padding:11px 13px;font-size:14px;color:#183b35;transition:border-color .15s}.field input::placeholder{color:#97a49e}.field input:focus{outline:3px solid #d9eee8;border-color:#328079}.submit{width:100%;border:0;border-radius:7px;min-height:45px;background:#287c73;color:white;font-size:13px;font-weight:700;cursor:pointer;padding:12px 18px;display:flex;justify-content:center;gap:14px;align-items:center}.submit:hover{background:#20655f}.google-button:hover:not(:disabled){background:#f1f6f3}a:focus-visible,button:focus-visible{outline:3px solid #7cb3a8;outline-offset:4px}.field-note{font-size:11px;color:#6b7d75;line-height:1.6;margin:-5px 0 20px}.auth-switch{font-size:12px;text-align:center;color:#657a73;margin:38px 0 0;line-height:1.8}.auth-switch a{color:#287c73;font-weight:700;text-decoration:none;margin-left:5px}.auth-footer{font-size:10px;text-align:center;color:#6b7e76;margin:42px 0 0;line-height:1.7}.auth-footer a{color:#4e7468}.alert{background:#fff3ee;color:#93432d;border:1px solid #f0d8cd;border-radius:8px;padding:12px;font-size:12px;line-height:1.6;margin:0 0 20px}.mobile-brand{display:none}
-@media(min-width:1600px){.brand-panel{padding:44px 56px 32px}.brand-story{max-width:580px}.auth-box{max-width:400px}}
-@media(max-width:800px){.gateway{display:block}.brand-panel{padding:25px 26px 30px}.brand-story{padding:36px 0 0;margin:0;max-width:100%}.brand-story h1{font-size:39px;letter-spacing:-1.7px;margin-bottom:16px}.brand-story .eyebrow{margin-bottom:12px}.intro{font-size:13px;max-width:100%}.feed-scene,.brand-footer{display:none}.auth-panel{padding:38px 26px 35px;justify-content:flex-start}.auth-box{max-width:400px}.auth-box h2{font-size:26px}.auth-switch{margin-top:28px}.auth-footer{margin-top:28px}}
-@media(prefers-reduced-motion:reduce){*{transition:none!important}}
-'''
+STYLE = Path(__file__).with_name('portal.css').read_text(encoding='utf-8')
+FULL_NAME = 'Automated Social-media Aggregation Platform'
+
+
+def header():
+    return ('<header class="site-header"><a class="brand" href="/" aria-label="ASAP home">'
+            '<span class="brand-mark" aria-hidden="true"></span>ASAP</a>'
+            '<nav class="header-nav" aria-label="Account navigation"><a href="/signin">Sign in</a>'
+            '<a class="button button-small" href="/register">Get started</a></nav></header>')
+
+
+def document(title, body):
+    return ('<!doctype html><html lang="en"><head><meta charset="utf-8">'
+            '<meta name="viewport" content="width=device-width,initial-scale=1">'
+            '<meta name="theme-color" content="#2e63a5"><title>'+escape(title)+'</title>'
+            '<style>'+STYLE+'</style></head><body>'+header()+body+'</body></html>')
+
+
+def home_page():
+    return document('ASAP — '+FULL_NAME, '''
+<main class="hero">
+  <section class="hero-copy" aria-labelledby="product-name">
+    <h1 id="product-name"><span>Automated</span> <span>Social-media</span> <span class="blue">Aggregation Platform</span></h1>
+    <p class="hero-description">Collect, review, and share what matters.</p>
+    <a class="button" href="/register">Create your feed <span aria-hidden="true">→</span></a>
+  </section>
+  <figure class="feed-art" aria-label="Example of an approved community news card">
+    <div class="card-outline" aria-hidden="true"></div><div class="card-outline second" aria-hidden="true"></div>
+    <div class="example-card">
+      <img src="/assets/architecture-sapphire-v1.png" width="1672" height="941" alt="Curved blue architectural facade reflecting the sky" fetchpriority="high">
+      <div class="example-copy"><p class="example-category">COMMUNITY NEWS</p>
+        <h2>Ideas worth sharing.</h2><span class="example-date">NOV 10</span>
+      </div>
+    </div>
+  </figure>
+</main>
+<footer class="site-footer" aria-label="Workflow">Collect <span aria-hidden="true">/</span> Review <span aria-hidden="true">/</span> Publish</footer>''')
 
 
 def auth_page(*, register=False, google_ready=False, csrf='', error='', email=''):
-    esc=lambda value:escape(str(value),quote=True)
-    title='Create your ASAP account' if register else 'Sign in to ASAP'
-    brand='<a class="brand" href="/" aria-label="ASAP home"><span class="brand-icon" aria-hidden="true"><i></i><i></i><i></i></span>ASAP</a>'
-    scene='''<div class="feed-scene" aria-label="An illustration of source updates becoming one approved feed" role="img"><div class="scene-dot"></div><div class="story-card back"><div class="source-row"><span class="source-icon">in</span><span class="source-icon">B</span><span class="source-icon">X</span><span>Your sources, together</span></div></div><div class="story-card"><div class="source-row"><span class="source-icon">A</span> ORGANIZATION NEWS</div><h2>Good stories deserve<br>a place to be seen.</h2><p>A new announcement. A research milestone.<br>The updates that matter to your community.</p><div class="card-foot"><span>One simple feed</span><span class="approved">✓ Reviewed &amp; ready</span></div></div><p class="scene-caption">Collect thoughtfully. Share with confidence.</p></div>'''
-    body='''<main class="gateway"><section class="brand-panel" aria-label="About ASAP">'''+brand+'''<div class="brand-story"><p class="eyebrow">A SIMPLE AGGREGATION PLATFORM</p><h1>Every update.<br> One clear story.</h1><p class="intro">Bring your organization’s updates together.<br>Review what matters. Share it in one beautiful feed.</p>'''+scene+'''</div><p class="brand-footer">Your community’s news. A little more connected.</p></section><section class="auth-panel" aria-labelledby="auth-heading"><div class="auth-box"><p class="eyebrow">WELCOME TO ASAP</p><h2 id="auth-heading">'''+('Make room for your stories' if register else 'Welcome back')+'''</h2><p class="auth-intro">'''+('Create an account for your own sources, review queue, and feed.' if register else 'Sign in to your sources, stories, and shared updates.')+'</p>'
+    esc = lambda value: escape(str(value), quote=True)
+    title = 'Create your ASAP account' if register else 'Sign in to ASAP'
+    body = '<main class="auth-main"><section class="auth-box" aria-labelledby="auth-heading">'
+    body += '<h1 id="auth-heading">'+('Create your account' if register else 'Welcome back')+'</h1>'
+    body += '<p class="auth-context">'+FULL_NAME+'</p>'
     if error:
-        body+='<p class="alert" role="alert">'+esc(error)+'</p>'
+        body += '<p class="alert" role="alert">'+esc(error)+'</p>'
     if google_ready:
-        body+='<a class="google-button" href="/auth/google"><span class="google-mark" aria-hidden="true">G</span>Continue with Google</a>'
+        body += '<a class="google-button" href="/auth/google"><span class="google-mark" aria-hidden="true">G</span>Continue with Google</a>'
     else:
-        body+='<button class="google-button" type="button" disabled aria-describedby="google-note"><span class="google-mark" aria-hidden="true">G</span>Continue with Google</button><p class="google-note" id="google-note">Google sign-in is coming soon. You can use email below.</p>'
-    body+='<div class="divider">or continue with email</div><form method="post" action="'+('/register' if register else '/signin')+'"><input type="hidden" name="csrf" value="'+esc(csrf)+'">'
-    body+='<label class="field" for="email"><span>Email address</span><input id="email" type="email" name="email" value="'+esc(email)+'" maxlength="254" autocomplete="email" placeholder="you@organization.com" required></label>'
-    body+='<label class="field" for="password"><span>Password</span><input id="password" type="password" name="password" '+('minlength="12" ' if register else '')+'maxlength="256" autocomplete="'+('new-password' if register else 'current-password')+'" required></label>'
+        body += '<button class="google-button" type="button" disabled aria-describedby="google-note"><span class="google-mark" aria-hidden="true">G</span>Continue with Google</button><p class="google-note" id="google-note">Google sign-in is coming soon. You can use email below.</p>'
+    body += '<div class="divider">or continue with email</div><form method="post" action="'+('/register' if register else '/signin')+'"><input type="hidden" name="csrf" value="'+esc(csrf)+'">'
+    body += '<label class="field" for="email"><span>Email address</span><input id="email" type="email" name="email" value="'+esc(email)+'" maxlength="254" autocomplete="email" placeholder="you@organization.com" required></label>'
+    body += '<label class="field" for="password"><span>Password</span><input id="password" type="password" name="password" '+('minlength="12" ' if register else '')+'maxlength="256" autocomplete="'+('new-password' if register else 'current-password')+'" required></label>'
     if register:
-        body+='<label class="field" for="confirm-password"><span>Confirm password</span><input id="confirm-password" type="password" name="confirm_password" minlength="12" maxlength="256" autocomplete="new-password" required></label><p class="field-note">Use at least 12 characters to keep your workspace secure.</p>'
-    body+='<button class="submit" type="submit">'+('Create account' if register else 'Sign in')+'<span aria-hidden="true">→</span></button></form>'
-    body+='<p class="auth-switch">'+('Already have an account? <a href="/signin">Sign in</a>' if register else 'New to ASAP? <a href="/register">Create an account</a>')+'</p><p class="auth-footer">Your sources and review queue stay in your own workspace.<br><a href="/feed">Explore the public feed</a></p></div></section></main>'
-    return '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#287c73"><title>'+title+'</title><style>'+STYLE+'</style></head><body>'+body+'</body></html>'
+        body += '<label class="field" for="confirm-password"><span>Confirm password</span><input id="confirm-password" type="password" name="confirm_password" minlength="12" maxlength="256" autocomplete="new-password" required></label><p class="field-note">Use at least 12 characters to keep your workspace secure.</p>'
+    body += '<button class="button submit" type="submit">'+('Create account' if register else 'Sign in')+'<span aria-hidden="true">→</span></button></form>'
+    body += '<p class="auth-switch">'+('Already have an account? <a href="/signin">Sign in</a>' if register else 'New to ASAP? <a href="/register">Create an account</a>')+'</p></section></main>'
+    return document(title, body)
