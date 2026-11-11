@@ -38,7 +38,7 @@ def render_console(posts,history,settings,config,session,view,esc,card,runtime=N
         return '<form method="post" action="'+route+'"><input type="hidden" name="csrf" value="'+csrf+'">'+''.join('<input type="hidden" name="'+esc(k)+'" value="'+esc(v)+'">' for k,v in fields.items())+'<button'+(' disabled' if disabled else '')+'>'+esc(label)+'</button></form>'
     def badge(value):
         cls='good' if value in ('Healthy','Running','Connected','PASS','Authenticated') else 'bad' if value in ('Error','FAIL','TIMEOUT','Reconnect required') else 'warn' if value in ('Pending Access','Waiting','RUNNING','Fetching','Queued') else ''
-        return '<span class="badge '+cls+'">'+esc(value)+'</span>'
+        return '<span class="badge '+cls+'">'+esc('Re-authentication required' if value=='Reconnect required' else value)+'</span>'
     navigation=[('dashboard','Dashboard'),('pending','Review Queue'),('sources','Sources'),('testing','Testing / Development'),('settings','Settings'),('approved','Published'),('rejected','Rejected')]
     feed_navigation=('<a class="'+('active' if view=='feed' else '')+'" href="/admin?view=feed">Public Feed</a><a href="/embed-demo" target="_blank" rel="noopener">Mock Website ↗</a>' if feed_url else '<a href="/feed" target="_blank">Public Feed ↗</a><a href="/embed-demo" target="_blank">Mock Website ↗</a>')
     body='<header><h1>ASAP Admin</h1><span>Operations console · '+form('/logout',{},'Sign out')+'</span></header><div class="layout"><aside>'+''.join('<a class="'+('active' if v==view else '')+'" href="/admin?view='+v+'">'+label+'</a>' for v,label in navigation)+feed_navigation+'</aside><main>'
@@ -67,7 +67,8 @@ def render_console(posts,history,settings,config,session,view,esc,card,runtime=N
             if friendly:error+=' · '+friendly
             actions=(form('/fetch',{'source_key':key},'Fetch Now')+form('/source-toggle',{'source_key':key},'Disable' if s.get('enabled') else 'Enable')) if s.get('account') and not s.get('draft') and (platform!='linkedin' or s.get('connection_id')) else ''
             remove='<form method="post" action="/source-remove"><input type="hidden" name="csrf" value="'+csrf+'"><input type="hidden" name="source_key" value="'+esc(key)+'"><button aria-label="Remove source" title="Remove source">&#10006;&#65038;</button></form>'
-            actions+=form('/'+platform+'/connect',{'source_key':key},'Re-authenticate' if s.get('authentication')=='Authenticated' else 'Authenticate')
+            if s.get('authentication')!='Authenticated':
+                actions+=form('/'+platform+'/connect',{'source_key':key},'Re-authenticate' if s.get('authentication')=='Reconnect required' else 'Authenticate')
             body+='<tr><td><a aria-label="Edit '+esc(platform)+' '+esc(s.get('account',''))+'" href="/admin?view=sources&amp;edit_source='+quote(key,safe='')+'">✎</a> <b>'+esc(platform)+'</b><br><small>'+esc(s.get('label') or s.get('account') or 'Not connected')+'</small></td><td>'+badge(s.get('authentication','Public access' if platform=='bluesky' else 'Not authenticated'))+'<br><small>'+esc(s['status'])+'</small></td><td>'+('Enabled' if s.get('enabled') else 'Disabled')+'<br>'+esc(s.get('interval_seconds') or 1800)+' sec</td><td>'+esc(stamp(s.get('last_attempt_at')))+'<br><small>Success: '+esc(stamp(s.get('last_success_at')))+'</small></td><td>'+str(s.get('fetched_count',0))+' fetched / '+str(s.get('new_count',0))+' new</td><td>'+esc(error)+'<br><small>'+esc(stamp(s.get('next_poll_at')) if s.get('next_poll_at') else '—')+'</small></td><td class="source-actions">'+actions+'</td><td class="source-delete">'+remove+'</td></tr>'
         body+='</table></div></section>'
         edit_key=query.get('edit_source',[''])[0]

@@ -346,7 +346,7 @@ class SocialTests(unittest.TestCase):
         self.assertEqual(landing.status_code,200)
         self.assertIn(b'ASAP Admin',landing.data)
         self.assertIn(b'class="badge good">Authenticated',landing.data)
-        self.assertIn(b'Re-authenticate',landing.data)
+        self.assertNotIn(b'Re-authenticate',landing.data)
         self.assertIn(b'Disabled',landing.data)
         self.assertEqual(client.post('/source-toggle',data={'csrf':'bad','source_key':'x:12345'}).status_code,403)
         # A replay cannot issue another session cookie.
