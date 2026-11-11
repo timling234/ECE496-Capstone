@@ -22,6 +22,7 @@ from .linkedin import Credentials, OAuth
 from .web_app import make_handler, page, esc
 from .workspaces import Workspace, Workspaces
 from .portal_ui import auth_page, home_page
+from .social_oauth import SocialOAuth
 
 COOKIE = 'asap_portal'
 
@@ -39,9 +40,10 @@ def create_app(db, password, runtime=None, *, start_workers=False, google=None, 
     default = Workspace(db, runtime, OAuth(Credentials(db.parent / 'linkedin_credentials')))
     workspaces = Workspaces(db.parent / 'workspaces', accounts, default, start_workers)
     handler_class = make_handler(db, password, port=5000, runtime=runtime, linkedin_oauth=default.oauth)
+    social = SocialOAuth()
     legacy_sessions = {}
     cache_lock = threading.RLock()
-    app.extensions.update(accounts=accounts, workspaces=workspaces, google=google)
+    app.extensions.update(accounts=accounts, workspaces=workspaces, google=google, social=social)
     if start_workers:
         workspaces.restore()
 
@@ -96,7 +98,7 @@ def create_app(db, password, runtime=None, *, start_workers=False, google=None, 
         response.headers['Cache-Control'] = 'public, max-age=86400' if request.endpoint=='static' else 'no-store'
         response.headers['X-Content-Type-Options'] = 'nosniff'
         response.headers['Referrer-Policy'] = 'no-referrer'
-        response.headers.setdefault('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; img-src https: http:; form-action 'self' https://www.linkedin.com; base-uri 'none'; frame-src 'self'")
+        response.headers.setdefault('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; img-src https: http:; form-action 'self' https://www.linkedin.com https://x.com https://bsky.social; base-uri 'none'; frame-src 'self'")
         if not request.path.endswith('/feed'):
             response.headers['X-Frame-Options'] = 'DENY'
         if secure:
@@ -241,6 +243,57 @@ def create_app(db, password, runtime=None, *, start_workers=False, google=None, 
             if cookie:
                 self.response.headers.add('Set-Cookie', cookie)
             return self.response
+
+    @app.get('/bluesky/client-metadata.json')
+    def bluesky_client_metadata():
+        return social.bluesky_metadata()
+
+    @app.post('/<provider>/connect')
+    def social_start(provider):
+        if provider=='linkedin':
+            return editorial('linkedin/connect')
+        if provider not in ('x','bluesky'):
+            abort(404)
+        workspace = workspaces.get(g.user['id']) if g.user else default
+        session = Adapter(workspace).session()
+        if not session or not session.get('authenticated'):
+            return redirect('/signin',303)
+        if not secrets.compare_digest(request.form.get('csrf',''),session['csrf']):
+            abort(403)
+        throttle('social-connect',5)
+        try:
+            url, nonce = social.begin(provider,session,workspace,g.session['token_hash'] if g.user else None)
+            response = redirect(url,303)
+            response.set_cookie('asap_connect_'+provider,nonce,max_age=600,secure=secure,
+                                httponly=True,samesite='Lax',path='/'+provider+'/callback')
+            return response
+        except Exception:
+            message = ('The administrator needs to configure X website authorization.' if provider=='x' and not os.environ.get('X_CLIENT_ID')
+                       else 'Authorization could not start. Return to Sources and try again later.')
+            return document('Connection unavailable','<p>'+esc(message)+'</p><a href="/admin?view=sources">Back to Sources</a>',400)
+
+    @app.get('/<provider>/callback')
+    def social_callback(provider):
+        # LinkedIn retains its existing callback handler.
+        if provider=='linkedin':
+            return editorial('linkedin/callback')
+        if provider not in ('x','bluesky'):
+            abort(404)
+        try:
+            if any(len(request.args.getlist(k))!=1 for k in ('state',)) or len(request.args.getlist('code'))>1:
+                raise ValueError('Invalid callback')
+            pending = social.consume(provider,request.args['state'],request.cookies.get('asap_connect_'+provider,''),
+                                     g.session['token_hash'] if g.user else None)
+            if 'error' in request.args or not request.args.get('code'):
+                raise ValueError('Authorization declined')
+            if provider=='bluesky' and len(request.args.getlist('iss'))!=1:
+                raise ValueError('Missing issuer')
+            social.complete(pending,request.args['code'],request.args.get('iss',''))
+            response = redirect('/admin?view=sources&notice=Account+connected.+Automatic+polling+remains+off+for+new+sources.',303)
+        except Exception:
+            response = document('Connection unsuccessful','<p>The connection was declined, expired, or could not be verified. Return to Sources to start again. Bluesky Authenticate currently supports bsky.social hosted accounts.</p><a href="/admin?view=sources">Back to Sources</a>',400)
+        response.delete_cookie('asap_connect_'+provider,path='/'+provider+'/callback')
+        return response
 
     @app.route('/u/<uid>/feed')
     @app.route('/u/<uid>/embed-demo')

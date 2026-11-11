@@ -119,3 +119,14 @@ the management shell with a copyable iframe snippet above its live preview.
 integration website. Adapt that mock to each integration partner's requirements
 when supplied. The current MSRG mock is an initial template, not the generic feed
 configuration page.
+
+
+## X / Bluesky Authenticate extension — 2026-11-11
+
+Sources now includes X OAuth 2.0 PKCE and Bluesky identity-only PAR/DPoP OAuth.
+See [social_auth.md](social_auth.md) for setup, exact scopes, hosted-account limits,
+isolation and API-call accounting. New source polling remains disabled. Google
+login and the previously accepted portal / Mock Website navigation are retained.
+Code and offline tests are complete; live provider acceptance still requires X
+administrator client configuration and the user's platform consent. Do not call
+that external acceptance complete or advance automatic moderation on that basis.

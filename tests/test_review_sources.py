@@ -92,7 +92,7 @@ class ReviewSourceTests(unittest.TestCase):
         result=self.render()
         positions=[result.index('>'+name+'</a>') for name in ['Dashboard','Review Queue','Sources','Testing / Development','Settings','Published','Rejected']]
         self.assertEqual(positions,sorted(positions))
-        self.assertIn('Public Feed ↗',result);self.assertIn('Embedding Preview ↗',result)
+        self.assertIn('Public Feed ↗',result);self.assertIn('Mock Website ↗',result)
 
     def test_source_add_edit_validation_and_credential_reference_preservation(self):
         """Verifies FR-1/7: shared provider-aware configuration, unique accounts, no secret input."""

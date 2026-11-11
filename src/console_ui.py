@@ -43,7 +43,7 @@ def render_console(posts,history,settings,config,session,view,esc,card,runtime=N
         body+='<p><a href="/admin?view=sources">Source configuration & live fetch status</a> · <a href="/admin?view=pending">Pending / Needs Review</a></p></section>'
         body+='<section class="panel"><h2>Recent editorial actions</h2><table><tr><th>Action</th><th>Source</th><th>Actor</th><th>Time</th></tr>'+''.join('<tr><td>'+esc(row[0])+'</td><td>'+esc(row[1])+' · '+esc(row[2])+'</td><td>'+esc(row[3])+'</td><td>'+esc(row[4])+'</td></tr>' for row in history)+'</table></section>'
     elif view=='sources':
-        body+='<section class="panel"><div class="section-heading"><h2>Sources</h2><a class="badge" href="/admin?view=sources&amp;source_form=add">+ Add Source</a></div><p><small>Fetch Now makes a live request even for a disabled source. Rate-limit cooldowns remain enforced. Times are UTC.</small></p><div class="scroll"><table><tr><th>Provider / account</th><th>Status</th><th>Polling</th><th>Last fetch / success</th><th>Result</th><th>Error / next due</th><th>Actions</th></tr>'
+        body+='<section class="panel"><p>'+form('/x/connect',{},'Authenticate X')+form('/bluesky/connect',{},'Authenticate Bluesky')+'</p><div class="section-heading"><h2>Sources</h2><a class="badge" href="/admin?view=sources&amp;source_form=add">+ Add Source</a></div><p><small>Fetch Now makes a live request even for a disabled source. Rate-limit cooldowns remain enforced. Times are UTC.</small></p><div class="scroll"><table><tr><th>Provider / account</th><th>Status</th><th>Polling</th><th>Last fetch / success</th><th>Result</th><th>Error / next due</th><th>Actions</th></tr>'
         for s in sources:
             platform=s['platform']; key=source_identity(s); code=s.get('error_code')
             error=(('HTTP '+str(code)+' · ') if code else '')+s.get('error_type','') if s.get('error_type') else '—'
@@ -51,7 +51,7 @@ def render_console(posts,history,settings,config,session,view,esc,card,runtime=N
                 {'FileNotFoundError':'Local token file missing','URLError':'Network connection failed','TimeoutError':'Provider request timed out','ValueError':'Invalid provider/configuration response'}.get(s.get('error_type'),''))
             if friendly:error+=' · '+friendly
             actions=(form('/fetch',{'source_key':key},'Fetch Now')+form('/source-toggle',{'source_key':key},'Disable' if s.get('enabled') else 'Enable')) if platform!='linkedin' or s.get('connection_id') else ''
-            if platform=='linkedin':actions+=form('/linkedin/connect',{},'Authenticate')
+            actions+=form('/'+platform+'/connect',{},'Authenticate')
             body+='<tr><td><a aria-label="Edit '+esc(platform)+' '+esc(s.get('account',''))+'" href="/admin?view=sources&amp;edit_source='+quote(key,safe='')+'">✎</a> <b>'+esc(platform)+'</b><br><small>'+esc(s.get('label') or s.get('account') or 'Connect a Page')+'</small></td><td>'+badge(s['status'])+'</td><td>'+('Enabled' if s.get('enabled') else 'Disabled')+'<br>'+esc(s.get('interval_seconds') or 1800)+' sec</td><td>'+esc(stamp(s.get('last_attempt_at')))+'<br><small>Success: '+esc(stamp(s.get('last_success_at')))+'</small></td><td>'+str(s.get('fetched_count',0))+' fetched / '+str(s.get('new_count',0))+' new</td><td>'+esc(error)+'<br><small>'+esc(stamp(s.get('next_poll_at')) if s.get('next_poll_at') else '—')+'</small></td><td>'+actions+'</td></tr>'
         body+='</table></div></section>'
         edit_key=query.get('edit_source',[''])[0]
@@ -63,11 +63,13 @@ def render_console(posts,history,settings,config,session,view,esc,card,runtime=N
             else:
                 platform=source['platform'] if source else query.get('provider',['bluesky'])[0]
                 if platform not in ('x','bluesky','linkedin'):platform='bluesky'
-                source=source or dict(platform=platform,account='',interval_seconds=1800,enabled=platform!='linkedin',page_size=5)
+                source=source or dict(platform=platform,account='',interval_seconds=1800,enabled=False,page_size=5)
                 body+='<section class="panel source-editor"><h2>'+('Edit Source' if edit_key else 'Add Source')+'</h2>'
                 if adding:
                     body+='<form method="get" action="/admin"><input type="hidden" name="view" value="sources"><input type="hidden" name="source_form" value="add"><label>Provider <select name="provider" aria-label="Provider">'+''.join('<option value="'+v+'" '+('selected' if v==platform else '')+'>'+label+'</option>' for v,label in [('bluesky','Bluesky'),('x','X'),('linkedin','LinkedIn')])+'</select></label><button>Choose provider</button></form>'
                 else:body+='<p>Provider: <b>'+esc(platform)+'</b></p>'
+                if platform in ('x','bluesky'):
+                    body+='<p>'+form('/'+platform+'/connect',{},'Authenticate '+('X' if platform=='x' else 'Bluesky'))+'</p>'
                 if platform=='linkedin':
                     body+='<p>Connect the LinkedIn account that administers your organization Page. Personal post retrieval is not supported. Authenticate on LinkedIn, approve access, then choose the Page to fetch from.</p>'+form('/linkedin/connect',{},'Authenticate')
                     if not source.get('connection_id'):
@@ -75,10 +77,10 @@ def render_console(posts,history,settings,config,session,view,esc,card,runtime=N
                         return body
                 body+='<form method="post" action="/source-save"><input type="hidden" name="csrf" value="'+csrf+'"><input type="hidden" name="provider" value="'+platform+'"><input type="hidden" name="source_key" value="'+esc(edit_key)+'">'
                 label='Account / Handle' if platform=='bluesky' else 'Account / User ID' if platform=='x' else 'Organization ID'
-                body+='<label>'+label+' <input type="text" name="account" value="'+esc(source.get('account'))+'" '+('required' if platform!='linkedin' else 'readonly')+'></label><label>Polling interval <input type="number" name="interval_seconds" min="'+('1800' if platform=='linkedin' else '1')+'" max="31536000" value="'+str(source.get('interval_seconds') or 1800)+'"> seconds</label>'
+                body+='<label>'+label+' <input type="text" name="account" value="'+esc(source.get('account'))+'" '+('readonly' if source.get('connection_id') else 'required')+'></label><label>Polling interval <input type="number" name="interval_seconds" min="'+('1800' if platform=='linkedin' else '1')+'" max="31536000" value="'+str(source.get('interval_seconds') or 1800)+'"> seconds</label>'
                 body+='<label><input type="checkbox" name="enabled" '+('checked' if source.get('enabled') else '')+' '+''+'>Enabled</label>'
                 body+='<label>'+('X page size (5–100)' if platform=='x' else 'LinkedIn page size (1–100)' if platform=='linkedin' else 'Bluesky page size (1–100)')+' <input type="number" name="page_size" min="'+('5' if platform=='x' else '1')+'" max="100" value="'+str(source.get('page_size',5))+'"></label>'
-                body+='<p><small>'+('X uses its existing local token reference; credentials are not sent to the browser.' if platform=='x' else 'LinkedIn pulls one recent page per fetch. Automatic polling is optional (minimum 30 minutes). LinkedIn posts use the same manual approval flow as other sources.' if platform=='linkedin' else 'Public author-feed retrieval; no posting credentials are inferred from this source.')+'</small></p><a href="/admin?view=sources">Cancel</a> <button>'+('Save Source' if edit_key else 'Add Source')+'</button></form></section>'
+                body+='<p><small>'+('Authenticate X to connect your account. Credentials stay on the server.' if platform=='x' else 'LinkedIn pulls one recent page per fetch. Automatic polling is optional (minimum 30 minutes). LinkedIn posts use the same manual approval flow as other sources.' if platform=='linkedin' else 'Public author-feed retrieval; no posting credentials are inferred from this source.')+'</small></p><a href="/admin?view=sources">Cancel</a> <button>'+('Save Source' if edit_key else 'Add Source')+'</button></form></section>'
     elif view=='testing':
         if not devtools or not devtools.enabled:body+='<section class="panel"><h2>Development tools disabled</h2><p>Enable locally with ASAP_DEV_TOOLS=1. Production default is disabled.</p></section>'
         else:

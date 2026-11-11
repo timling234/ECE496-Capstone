@@ -18,6 +18,8 @@ def configure_source(config, fields, key=None):
     platform=existing['platform'] if existing else fields.get('provider','')
     if platform not in ('x','bluesky','linkedin'):raise ValueError('Unsupported provider')
     enabled=fields.get('enabled')=='on'
+    if existing and existing.get('connection_id') and fields.get('account','').strip()!=existing.get('account'):
+        raise ValueError('Authenticate another account to change this connected source')
     account=fields.get('account','').strip()
     interval=int(fields.get('interval_seconds') or 1800)
     if not 1<=interval<=31536000:raise ValueError('Interval must be 1–31536000 seconds')

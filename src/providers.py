@@ -33,19 +33,20 @@ class Provider(ABC):
 class XProvider(Provider):
     platform = "x"
 
-    def __init__(self, account, token_file=X_TOKEN, page_size=5, transport=fetch_json):
+    def __init__(self, account, token_file=X_TOKEN, page_size=5, transport=fetch_json, token_getter=None):
         if not isinstance(account, str) or not (account.isascii() and account.isdigit()):
             raise ValueError("X account must be a numeric ID")
         if type(page_size) is not int or not 5 <= page_size <= 100:
             raise ValueError("X page_size must be between 5 and 100")
         self.account, self.token_file = account, Path(token_file)
         self.page_size, self.transport = page_size, transport
+        self.token_getter = token_getter
 
     # FR-1: Existing credential-file handling; incremental pagination
     def fetch(self, checkpoint):
         if checkpoint is not None and not (checkpoint.isascii() and checkpoint.isdigit()):
             raise ValueError("Invalid X checkpoint")
-        token = self.token_file.read_text(encoding="utf-8-sig").strip()
+        token = self.token_getter() if self.token_getter else self.token_file.read_text(encoding="utf-8-sig").strip()
         if not token:
             raise ValueError("X token file is empty")
         params = {"max_results": self.page_size,

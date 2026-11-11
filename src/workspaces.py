@@ -47,7 +47,7 @@ class Workspaces:
                 # Never borrow the original administrator's X token file.
                 data = json.loads(path.read_text())
                 for item in data['sources']:
-                    if item['platform'] == 'x' and item.get('token_file') != str(directory / 'x-token.txt'):
+                    if item['platform'] == 'x' and not item.get('connection_id') and item.get('token_file') != str(directory / 'x-token.txt'):
                         # Browser forms do not accept filesystem paths. Reject instead of
                         # silently defaulting to a credential in the repository root.
                         raise ValueError('X requires a dedicated workspace token configured by the server administrator.')
