@@ -167,7 +167,7 @@ def make_handler(db,password,host='127.0.0.1',port=5000,runtime=None,dev_enabled
                 conn.commit()
                 history=conn.execute('SELECT action,platform,post_id,actor,acted_at FROM editorial_actions ORDER BY id DESC LIMIT 20').fetchall()
             body=render_console(posts,history,settings,self.read_config(),session,view,esc,card,self.runtime,self.devtools,
-                query.get('notice',[''])[0],query=query,notification_config=notification_config,notification_state=notification_state)
+                query.get('notice',[''])[0],query=query,notification_config=notification_config,notification_state=notification_state,feed_url=getattr(self,'feed_url',None))
             self.send(200,page('ASAP Admin',body,console=True))
         def do_POST(self):
             session=self.session()

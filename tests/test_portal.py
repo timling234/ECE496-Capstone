@@ -40,6 +40,7 @@ class PortalTests(unittest.TestCase):
         token = csrf(client.get('/register'))
         response = client.post('/register', data=dict(csrf=token, email=email, password=PASSWORD, confirm_password=PASSWORD))
         self.assertEqual(response.status_code, 303)
+        self.assertEqual(response.location, '/admin')
         session = self.accounts.session(client.get_cookie(COOKIE).value)
         return self.accounts.user(session['user_id'])
 
@@ -82,7 +83,7 @@ class PortalTests(unittest.TestCase):
             self.assertIsNotNone(conn.execute('SELECT 1 FROM sessions WHERE token_hash=?', (digest(token),)).fetchone())
         restarted = create_app(self.db, 'admin', google=self.google, secure=False)
         client = restarted.test_client(); client.set_cookie(COOKIE, token)
-        self.assertEqual(client.get('/app').status_code, 200)
+        self.assertEqual(client.get('/app').location, '/admin')
         self.assertEqual(client.post('/logout', data={'csrf':'bad'}).status_code, 403)
         self.assertEqual(client.get('/logout').status_code, 403)
         csrf_value = csrf(client.get('/account'))
@@ -115,6 +116,11 @@ class PortalTests(unittest.TestCase):
         user = self.register(client, 'new@example.com')
         self.assertIsNone(client.get_cookie('asap_session_5000'))
         self.assertIn(b'ASAP Workspace', client.get('/admin').data)
+        feed_console = client.get('/admin?view=feed').data
+        self.assertIn(b'ASAP Workspace', feed_console)
+        self.assertIn(b'aria-label="Feed embed code"', feed_console)
+        self.assertIn(('src="http://localhost/u/'+user['id']+'/feed"').encode(), feed_console)
+        self.assertNotIn(b'Embedding Preview', client.get('/admin').data)
         preview = client.get('/u/'+user['id']+'/embed-demo')
         self.assertIn(('src="/u/'+user['id']+'/feed"').encode(), preview.data)
 

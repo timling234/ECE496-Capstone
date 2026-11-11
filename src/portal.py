@@ -77,7 +77,7 @@ def create_app(db, password, runtime=None, *, start_workers=False, google=None, 
     def signed_in(user):
         token = accounts.new_session(user['id'], g.token)
         workspaces.get(user['id'])
-        response = set_cookie(redirect('/app', 303), token, True)
+        response = set_cookie(redirect('/admin', 303), token, True)
         # A workspace sign-in cannot inherit a previous shared-admin login.
         response.delete_cookie('asap_session_5000', path='/')
         return response
@@ -124,7 +124,7 @@ def create_app(db, password, runtime=None, *, start_workers=False, google=None, 
     @app.get('/')
     def home():
         if g.user:
-            return redirect('/app',303)
+            return redirect('/admin',303)
         return Response(home_page(),content_type='text/html; charset=utf-8')
 
     @app.route('/register', methods=['GET', 'POST'])
@@ -132,7 +132,7 @@ def create_app(db, password, runtime=None, *, start_workers=False, google=None, 
     def sign_in():
         register = request.path == '/register'
         if g.user:
-            return redirect('/app', 303)
+            return redirect('/admin', 303)
         error = ''
         if request.method == 'POST':
             check_csrf(); throttle('register' if register else 'signin', 5 if register else 8)
@@ -157,14 +157,7 @@ def create_app(db, password, runtime=None, *, start_workers=False, google=None, 
     def dashboard():
         if not g.user:
             return redirect('/signin', 303)
-        workspace = workspaces.get(g.user['id'])
-        with closing(sqlite3.connect(workspace.db)) as conn:
-            count = conn.execute('SELECT count(*) FROM posts').fetchone()[0]
-        prefix = '/u/' + g.user['id']
-        return document('Your ASAP workspace', '<section class="panel"><h2>Welcome, ' + esc(g.user['email']) + '</h2><p>' + str(count) + ' saved posts</p>'
-            '<p><a href="/admin">Open review queue and source settings</a></p><p><a href="' + prefix + '/feed">Your public feed</a> · <a href="' + prefix + '/embed-demo">Embedding preview</a></p>'
-            '<p>New sources start with automatic polling off. Posts enter your public feed only after approval.</p></section>'
-            '<section class="panel"><h2>Embed your feed</h2><p>Paste this into your website:</p><pre style="white-space:pre-wrap;overflow-wrap:anywhere">' + esc('<iframe src="' + request.host_url.rstrip('/') + prefix + '/feed" title="ASAP news" style="width:100%;height:620px;border:0"></iframe>') + '</pre></section>')
+        return redirect('/admin',303)
 
     @app.get('/account')
     def account():
@@ -187,7 +180,7 @@ def create_app(db, password, runtime=None, *, start_workers=False, google=None, 
                 abort(403)
             check_csrf(); link_user = g.user['id']
         elif g.user:
-            return redirect('/app', 303)
+            return redirect('/admin', 303)
         throttle('google-start')
         anonymous()
         state, nonce, verifier = accounts.start_oauth(g.token, link_user)
@@ -230,6 +223,7 @@ def create_app(db, password, runtime=None, *, start_workers=False, google=None, 
             self.db, self.runtime, self.linkedin_oauth = workspace.db, workspace.runtime, workspace.oauth
             self.config_path = workspace.runtime.config_path if workspace.runtime else workspace.db.parent / 'polling.local.json'
             self.devtools = None
+            self.feed_url = request.host_url.rstrip('/') + ('/u/'+g.user['id']+'/feed' if g.user else '/feed')
             self.path = request.full_path.rstrip('?')
             self.headers = request.headers
             self.rfile = io.BytesIO(g.request_body)
@@ -280,7 +274,7 @@ def create_app(db, password, runtime=None, *, start_workers=False, google=None, 
         # /feed and /embed-demo retain the original deployment's public identity.
         workspace = default if path in ('feed', 'embed-demo') or not g.user else workspaces.get(g.user['id'])
         if path == 'login' and g.user:
-            return redirect('/app', 303)
+            return redirect('/admin', 303)
         if path == 'linkedin/callback':
             state = request.args.get('state', '')
             # Strict administrator cookies are deliberately absent on this cross-site

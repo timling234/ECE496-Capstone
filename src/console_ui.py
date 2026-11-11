@@ -16,7 +16,7 @@ def stamp(value):
     return datetime.fromtimestamp(value,timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC') if value is not None else 'Never'
 
 
-def render_console(posts,history,settings,config,session,view,esc,card,runtime=None,devtools=None,notice='',query=None,notification_config=None,notification_state=None):
+def render_console(posts,history,settings,config,session,view,esc,card,runtime=None,devtools=None,notice='',query=None,notification_config=None,notification_state=None,feed_url=None):
     query=query or {}
     csrf=session['csrf']
     def form(route,fields,label,disabled=False):
@@ -25,12 +25,17 @@ def render_console(posts,history,settings,config,session,view,esc,card,runtime=N
         cls='good' if value in ('Healthy','Running','Connected','PASS') else 'bad' if value in ('Error','FAIL','TIMEOUT') else 'warn' if value in ('Pending Access','Waiting','RUNNING','Fetching','Queued') else ''
         return '<span class="badge '+cls+'">'+esc(value)+'</span>'
     navigation=[('dashboard','Dashboard'),('pending','Review Queue'),('sources','Sources'),('testing','Testing / Development'),('settings','Settings'),('approved','Published'),('rejected','Rejected')]
-    body='<header><h1>ASAP Admin</h1><span>Operations console · '+form('/logout',{},'Sign out')+'</span></header><div class="layout"><aside>'+''.join('<a class="'+('active' if v==view else '')+'" href="/admin?view='+v+'">'+label+'</a>' for v,label in navigation)+'<a href="/feed" target="_blank">Public Feed ↗</a><a href="/embed-demo" target="_blank">Embedding Preview ↗</a></aside><main>'
+    feed_navigation=('<a class="'+('active' if view=='feed' else '')+'" href="/admin?view=feed">Public Feed</a>' if feed_url else '<a href="/feed" target="_blank">Public Feed ↗</a><a href="/embed-demo" target="_blank">Embedding Preview ↗</a>')
+    body='<header><h1>ASAP Admin</h1><span>Operations console · '+form('/logout',{},'Sign out')+'</span></header><div class="layout"><aside>'+''.join('<a class="'+('active' if v==view else '')+'" href="/admin?view='+v+'">'+label+'</a>' for v,label in navigation)+feed_navigation+'</aside><main>'
     body+='<p><a href="/admin?view='+esc(view)+'">Refresh status / results</a></p>'
     if notice:body+='<div class="notice">'+esc(notice)+'</div>'
     sources=runtime.snapshot() if runtime else [dict(s,status=('Disabled' if s.get('connection_id') else 'Not connected') if s['platform']=='linkedin' else 'Disabled') for s in config['sources']]
     counts={'Pending':sum(p['editorial_status'] in ('pending','needs review') for p in posts),'Approved':sum(p['editorial_status']=='approved' for p in posts),'Rejected':sum(p['editorial_status']=='rejected' for p in posts),'Duplicate Groups':len({p['group'] for p in posts if p['group'] and p['editorial_status'] in ('pending','needs review')})}
-    if view=='dashboard':
+    if view=='feed' and feed_url:
+        snippet='<iframe src="'+feed_url+'" title="ASAP news" style="width:100%;height:620px;border:0"></iframe>'
+        body+='<section class="panel"><h2>Public Feed</h2><h3>Embed your feed</h3><p>Copy this code into your website:</p><textarea readonly aria-label="Feed embed code" rows="3" style="width:100%;max-width:100%;font-family:monospace">'+esc(snippet)+'</textarea></section>'
+        body+='<section class="panel"><h2>Iframe preview</h2><iframe src="'+esc(feed_url)+'" title="Your public feed preview" style="width:100%;height:620px;border:0"></iframe></section>'
+    elif view=='dashboard':
         body+='<div class="metrics">'+''.join('<div class="metric">'+key+'<strong>'+str(value)+'</strong></div>' for key,value in counts.items())+'</div><section class="panel"><h2>System health</h2><table><tbody>'
         status=[('Web Server','Running'),('Polling Worker','Error' if runtime and runtime.error else 'Running' if runtime and runtime.running else 'Stopped'),('Database','Connected')]+[(s['platform'].upper() if s['platform']=='x' else s['platform'].title(),s['status']) for s in sources]
         body+=''.join('<tr><td>'+esc(k)+'</td><td>'+badge(v)+'</td></tr>' for k,v in status)+'</tbody></table>'
