@@ -436,7 +436,7 @@ def create_app(db, password, runtime=None, *, start_workers=False, google=None, 
         if g.user and response.content_type.startswith('text/html') and path == 'admin':
             uid = g.user['id']
             content = response.get_data().replace(b'href="/feed"', ('href="/u/' + uid + '/feed"').encode()).replace(b'href="/embed-demo"', ('href="/u/' + uid + '/embed-demo"').encode())
-            content = content.replace(b'<h1>ASAP Admin</h1>', ('<h1>ASAP Workspace</h1><a href="/app">My workspace</a><a href="/account">Account</a><span>' + esc(g.user['email']) + '</span>').encode())
+            content = content.replace(b'<h1>ASAP Admin</h1>', ('<h1>ASAP Workspace</h1><span>' + esc(g.user['email']) + '</span>').encode())
             response.set_data(content)
         return response
 
