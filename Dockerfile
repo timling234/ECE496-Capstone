@@ -4,6 +4,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 WORKDIR /app
 RUN groupadd --gid 10001 asap && useradd --uid 10001 --gid asap --no-create-home asap \
     && mkdir -p /data && chown asap:asap /data
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
 COPY --chown=asap:asap src/ ./src/
 COPY --chown=asap:asap tests/ ./tests/
 COPY --chown=asap:asap config/ ./config/

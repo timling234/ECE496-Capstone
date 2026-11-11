@@ -1,8 +1,5 @@
 """FR-7/FR-9: simple local launch, existing SQLite content and integrated source polling."""
 from contextlib import closing
-import ssl
-import threading
-from http.server import ThreadingHTTPServer
 import argparse
 import getpass
 import os
@@ -10,7 +7,6 @@ import sqlite3
 from pathlib import Path
 from src.store_poc import ROOT, store, process_stored
 from src.web_editorial import initialize
-from src.web_app import make_server
 from src.app_runtime import AppRuntime
 
 
@@ -58,25 +54,21 @@ def main():
     with closing(sqlite3.connect(args.db)) as conn:
         store(conn,[]);process_stored(conn);conn.commit();initialize(conn);conn.commit()
     runtime=AppRuntime(args.db,args.config)
-    server=make_server(args.db,password,host=args.host,port=args.port,runtime=runtime,dev_enabled=os.environ.get('ASAP_DEV_TOOLS')=='1')
-    https_server=None
+    from src.portal import create_app
+    from waitress import serve
     if args.https_port:
-        if not args.tls_cert or not args.tls_key:parser.error('HTTPS requires --tls-cert and --tls-key')
-        context=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-        context.load_cert_chain(args.tls_cert,args.tls_key)
-        https_server=ThreadingHTTPServer((args.host,args.https_port),server.RequestHandlerClass)
-        https_server.socket=context.wrap_socket(https_server.socket,server_side=True)
-        threading.Thread(target=https_server.serve_forever,name='asap-https',daemon=True).start()
-        print(f'HTTPS Admin: https://localhost:{https_server.server_port}/admin')
+        parser.error('Use the HTTPS reverse proxy for the Flask portal; direct TLS flags are no longer supported.')
+    app=create_app(args.db,password,runtime=runtime,start_workers=True,
+                   trust_proxy=os.environ.get('ASAP_TRUST_PROXY')=='1')
     runtime.start()
-    print(f'Admin:       http://localhost:{server.server_port}/admin')
-    print(f'Public Feed: http://localhost:{server.server_port}/feed')
-    print('Polling worker started. Enabled sources make live API requests; Admin controls take effect at runtime. Ctrl+C to stop.')
-    print('Development tools: '+('enabled' if server.devtools.enabled else 'disabled'))
-    try:server.serve_forever()
+    print(f'ASAP portal: http://{args.host}:{args.port}/')
+    print('Flask + Waitress, one process; workspace polling starts only for explicitly enabled sources.')
+    try:
+        serve(app,host=args.host,port=args.port,threads=8,clear_untrusted_proxy_headers=os.environ.get('ASAP_TRUST_PROXY')!='1',
+              max_request_body_size=16384,channel_timeout=30)
     except KeyboardInterrupt:pass
     finally:
-        runtime.stop();server.server_close()
-        if https_server:https_server.shutdown();https_server.server_close()
+        app.extensions['workspaces'].stop()
+        runtime.stop()
 
 if __name__=='__main__':main()

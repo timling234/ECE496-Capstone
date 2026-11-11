@@ -1,3 +1,9 @@
+> Stage 2 update (2026-11-10): the current working implementation uses Flask +
+> Waitress with local accounts and isolated SQLite workspaces. This supersedes the
+> single-admin/standard-library web transport notes below. The original provider and
+> editorial pipeline remains in use. See [stage2_portal.md](stage2_portal.md).
+> The notes below describe the original beta handoff baseline at feb8485.
+
 # Jarvis handoff: ASAP / ECE496
 
 Updated 2026-11-09. Repository: https://github.com/timling234/ECE496-Capstone

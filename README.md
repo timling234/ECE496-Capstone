@@ -1,3 +1,9 @@
+> Jarvis stage 2 (2026-11-10): production now uses Flask + Waitress. Install
+> `requirements.txt` for local runs. The portal adds `/register`, `/signin`, `/app`,
+> independent account workspaces and server-side Google OIDC. See
+> [stage2_portal.md](docs/stage2_portal.md) for setup, isolation and deployment details.
+> Google live acceptance requires a Web OAuth client; SMTP app passwords do not apply.
+
 # ASAP Project Timeline & Current Status
 
 **Course:** University of Toronto ECE496 Capstone  

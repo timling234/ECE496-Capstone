@@ -1,4 +1,4 @@
-"""FR-7/FR-9: single-admin local web console and approved-only feed.
+"""FR-7/FR-9: editorial console and approved-only feed.
 No external reference code used. Standard library implementation.
 """
 from contextlib import closing
@@ -66,7 +66,7 @@ def card(p,csrf=None,show_origin=True,return_view="pending"):
         body+='<details><summary>Edit announcement</summary><form method="post" action="/edit"><input type="hidden" name="csrf" value="'+csrf+'"><input type="hidden" name="post_id" value="'+esc(p['post_id'])+'"><textarea name="text" maxlength="10000" required>'+esc(p['text'])+'</textarea><button>Save edit (requires review)</button></form></details>'
     return body+'</article>'
 
-def make_server(db,password,host='127.0.0.1',port=5000,runtime=None,dev_enabled=False,linkedin_oauth=None):
+def make_handler(db,password,host='127.0.0.1',port=5000,runtime=None,dev_enabled=False,linkedin_oauth=None):
     sessions={}; attempts={}
     cookie_secure='; Secure' if os.environ.get('ASAP_COOKIE_SECURE')=='1' else ''
     cookie_name="asap_session_"+str(port)
@@ -75,8 +75,6 @@ def make_server(db,password,host='127.0.0.1',port=5000,runtime=None,dev_enabled=
     linkedin_oauth=linkedin_oauth or OAuth(Credentials(config_path.parent/'linkedin_credentials'))
     oauth_cookie='asap_linkedin_'+str(port)
     example=Path(__file__).resolve().parents[1]/'config'/'polling.example.json'
-    def read_config():
-        return json.loads((config_path if config_path.exists() else example).read_text(encoding='utf-8'))
     def linkedin_choices(session):
         choice=session.get('linkedin_choice',{})
         csrf=esc(session['csrf'])
@@ -89,6 +87,12 @@ def make_server(db,password,host='127.0.0.1',port=5000,runtime=None,dev_enabled=
         if choice.get('more'):body+='<form method="post" action="/linkedin/pages"><input type="hidden" name="csrf" value="'+csrf+'"><input type="hidden" name="more" value="1"><button>Load more Pages</button></form>'
         return body+'<p><a href="/admin?view=sources">Back to Sources</a></p>'
     class Handler(BaseHTTPRequestHandler):
+        def read_config(self):
+            path=self.config_path if self.config_path.exists() else example
+            return json.loads(path.read_text(encoding='utf-8'))
+        def actor(self):
+            session=self.session() or {}
+            return session.get('user_id') or 'admin'
         def log_message(self,*args): pass # Never log credentials, cookies or post content.
         def send(self,status,body,cookie=None):
             self.send_response(status)
@@ -112,7 +116,7 @@ def make_server(db,password,host='127.0.0.1',port=5000,runtime=None,dev_enabled=
             session=sessions.get(token)
             if session and session['expires']>time.time(): return session
             sessions.pop(token,None); return None
-        def db_connection(self): return sqlite3.connect(db,timeout=10)
+        def db_connection(self): return sqlite3.connect(self.db,timeout=10)
         def do_GET(self):
             parsed=urlparse(self.path); route=parsed.path
             if route=='/linkedin/callback':
@@ -126,7 +130,7 @@ def make_server(db,password,host='127.0.0.1',port=5000,runtime=None,dev_enabled=
                 try:
                     if any(len(values.get(k,[]))!=1 for k in ('state',)) or len(values.get('code',[]))>1:
                         raise ValueError('Invalid LinkedIn callback')
-                    linked_session=linkedin_oauth.finish(values['state'][0],nonce.value if nonce else '',
+                    linked_session=self.linkedin_oauth.finish(values['state'][0],nonce.value if nonce else '',
                         values.get('code',[''])[0],denied='error' in values)
                     body=linkedin_choices(linked_session)
                     return self.send(200,page('LinkedIn connected',body),oauth_cookie+'=; HttpOnly; SameSite=Lax; Path=/linkedin/callback; Max-Age=0'+cookie_secure)
@@ -162,7 +166,7 @@ def make_server(db,password,host='127.0.0.1',port=5000,runtime=None,dev_enabled=
                 notification_state=notifications.summary(conn)
                 conn.commit()
                 history=conn.execute('SELECT action,platform,post_id,actor,acted_at FROM editorial_actions ORDER BY id DESC LIMIT 20').fetchall()
-            body=render_console(posts,history,settings,read_config(),session,view,esc,card,runtime,devtools,
+            body=render_console(posts,history,settings,self.read_config(),session,view,esc,card,self.runtime,self.devtools,
                 query.get('notice',[''])[0],query=query,notification_config=notification_config,notification_state=notification_state)
             self.send(200,page('ASAP Admin',body,console=True))
         def do_POST(self):
@@ -185,22 +189,22 @@ def make_server(db,password,host='127.0.0.1',port=5000,runtime=None,dev_enabled=
                 return self.redirect('/admin',cookie_name+'='+token+cookie_secure+'; HttpOnly; SameSite=Strict; Path=/; Max-Age=28800')
             if not session['authenticated']:return self.send(403,page('Sign in required',''))
             if route=='/linkedin/connect':
-                if not runtime:return self.send(400,page('LinkedIn unavailable','The source runtime is required.'))
-                try:url,nonce=linkedin_oauth.begin(session)
+                if not self.runtime:return self.send(400,page('LinkedIn unavailable','The source runtime is required.'))
+                try:url,nonce=self.linkedin_oauth.begin(session)
                 except ValueError as error:return self.send(400,page('LinkedIn setup required',esc(error)))
                 return self.redirect(url,oauth_cookie+'='+nonce+'; HttpOnly; SameSite=Lax; Path=/linkedin/callback; Max-Age=600'+cookie_secure)
             if route=='/linkedin/pages':
-                try:linkedin_oauth.pages(session,more=value('more')=='1')
+                try:self.linkedin_oauth.pages(session,more=value('more')=='1')
                 except Exception:return self.send(400,page('LinkedIn Pages unavailable','No Page was added. <a href="/linkedin/choose">Try loading your Pages again</a>, or reconnect from Sources.'))
                 return self.redirect('/linkedin/choose')
             if route=='/linkedin/select':
                 try:
-                    if not runtime:raise ValueError('The source runtime is required')
+                    if not self.runtime:raise ValueError('The source runtime is required')
                     choice=session.get('linkedin_choice')
                     if not choice or choice['expires']<=time.time() or value('organization') not in choice['pages']:
                         raise ValueError('Choose a Page returned by your LinkedIn authorization')
-                    with runtime.lock:
-                        config=runtime.read_config()
+                    with self.runtime.lock:
+                        config=self.runtime.read_config()
                         account=value('organization')
                         source=find_source(config,'linkedin:'+account)
                         if source is None:
@@ -210,7 +214,7 @@ def make_server(db,password,host='127.0.0.1',port=5000,runtime=None,dev_enabled=
                             config['sources'].append(source)
                         source.update(connection_id=choice['connection'],label=choice['pages'][account],
                                       enabled=False,interval_seconds=1800,page_size=100)
-                        runtime.save_config(config)
+                        self.runtime.save_config(config)
                         session.pop('linkedin_choice',None)
                     return self.redirect('/admin?view=sources&notice=LinkedIn+Page+connected.+Use+Fetch+Now+when+ready.')
                 except ValueError as error:return self.send(400,page('LinkedIn Page unavailable',esc(error)))
@@ -220,14 +224,14 @@ def make_server(db,password,host='127.0.0.1',port=5000,runtime=None,dev_enabled=
             if route in ('/fetch','/source-toggle','/dev-task'):
                 try:
                     if route=='/dev-task':
-                        if not devtools or not devtools.enabled:raise ValueError('Development tools are disabled')
-                        devtools.submit(value('test_id'),value('text'))
+                        if not self.devtools or not self.devtools.enabled:raise ValueError('Development tools are disabled')
+                        self.devtools.submit(value('test_id'),value('text'))
                         return self.redirect('/admin?view=testing')
-                    if not runtime:raise ValueError('Polling runtime is not active in this server')
+                    if not self.runtime:raise ValueError('Polling runtime is not active in this server')
                     key=value('source_key') or value('platform')
-                    if route=='/fetch':runtime.request_fetch(key)
+                    if route=='/fetch':self.runtime.request_fetch(key)
                     else:
-                        config=runtime.read_config()
+                        config=self.runtime.read_config()
                         source=find_source(config,key)
                         if source is None and key in ('x','bluesky'):
                             matches=[s for s in config['sources'] if s['platform']==key]
@@ -236,20 +240,20 @@ def make_server(db,password,host='127.0.0.1',port=5000,runtime=None,dev_enabled=
                         if source is None:raise ValueError('Source not configured')
                         source['enabled']=not source.get('enabled',False)
                         source['interval_seconds']=source.get('interval_seconds') or 1800
-                        runtime.save_config(config)
+                        self.runtime.save_config(config)
                     return self.redirect('/admin?view=sources')
                 except ValueError as exc:return self.send(400,page('Operation unavailable',esc(exc)))
             if route=='/source-save':
                 try:
-                    config=read_config()
+                    config=self.read_config()
                     configure_source(config,{k:value(k) for k in ('provider','account','interval_seconds','enabled','page_size')},value('source_key') or None)
-                    if not runtime:raise ValueError('Source management requires the app polling runtime')
-                    runtime.save_config(config)
+                    if not self.runtime:raise ValueError('Source management requires the app polling runtime')
+                    self.runtime.save_config(config)
                 except ValueError as exc:return self.send(400,page('Invalid source configuration',esc(exc)))
                 return self.redirect('/admin?view=sources')
             if route=='/sources':
                 try:
-                    config=read_config()
+                    config=self.read_config()
                     if any(sum(s['platform']==platform for s in config['sources'])>1 for platform in ('x','bluesky')):raise ValueError('Use per-source editing when multiple accounts are configured')
                     for source in config['sources']:
                         platform=source['platform']
@@ -259,11 +263,11 @@ def make_server(db,password,host='127.0.0.1',port=5000,runtime=None,dev_enabled=
                         if not account or (platform=='x' and not account.isdecimal()):raise ValueError('A valid source account is required')
                         if (interval is not None and interval<1) or (enabled and interval is None):raise ValueError('Enabled sources require a positive interval')
                         source.update(account=account,enabled=enabled,interval_seconds=interval)
-                    if runtime:runtime.save_config(config)
+                    if self.runtime:self.runtime.save_config(config)
                     else:
-                        config_path.parent.mkdir(parents=True,exist_ok=True)
-                        temporary=config_path.with_suffix('.json.tmp')
-                        temporary.write_text(json.dumps(config,indent=2),encoding='utf-8');temporary.replace(config_path)
+                        self.config_path.parent.mkdir(parents=True,exist_ok=True)
+                        temporary=self.config_path.with_suffix('.json.tmp')
+                        temporary.write_text(json.dumps(config,indent=2),encoding='utf-8');temporary.replace(self.config_path)
                 except ValueError as exc:return self.send(400,page('Invalid source configuration',esc(exc)))
                 return self.redirect('/admin?view=sources')
             if route=='/notifications':
@@ -271,32 +275,47 @@ def make_server(db,password,host='127.0.0.1',port=5000,runtime=None,dev_enabled=
                     with closing(self.db_connection()) as conn:
                         notifications.save_settings(conn,bool(value('enabled')),value('channel'),value('recipient'))
                 except ValueError as exc:return self.send(400,page('Invalid notification settings',esc(exc)))
-                if runtime:runtime.wake.set()
+                if self.runtime:self.runtime.wake.set()
                 return self.redirect('/admin?view=settings')
             if route=='/order':return self.send(410,page('Manual order removed','Use Pin and newest-first ordering.'))
             if route in ('/edit','/presentation'):
                 try:
                     with closing(self.db_connection()) as conn:
-                        if route=='/edit':edit_announcement(conn,value('post_id'),value('text'))
+                        if route=='/edit':edit_announcement(conn,value('post_id'),value('text'),actor=self.actor())
                         elif route=='/order':set_order(conn,value('platform'),value('post_id'),value('position'))
                         else:save_presentation(conn,value('accent'),value('font_size'),bool(value('show_origin')))
                 except ValueError as exc:return self.send(400,page('Invalid change',esc(exc)))
                 return self.redirect('/admin?view=settings' if route=='/presentation' else '/admin?view=pending')
             if route=='/announcement':
                 try:
-                    with closing(self.db_connection()) as conn:create_announcement(conn,value('text'))
+                    with closing(self.db_connection()) as conn:create_announcement(conn,value('text'),actor=self.actor())
                 except ValueError as exc:return self.send(400,page('Invalid announcement',esc(exc)))
                 return self.redirect('/admin')
             if route!='/action':return self.send(404,page('Not found',''))
             try:
-                with closing(self.db_connection()) as conn:decide(conn,value('platform'),value('post_id'),value('action'))
+                with closing(self.db_connection()) as conn:decide(conn,value('platform'),value('post_id'),value('action'),actor=self.actor())
             except ValueError as exc:return self.send(400,page('Action unavailable',esc(exc)))
             destination=value('return_view') if value('action') in ('pin','unpin') else 'pending'
             if destination not in ('approved','pending','rejected'):destination='approved'
             self.redirect('/admin?view='+destination)
-    server=ThreadingHTTPServer((host,port),Handler)
-    cookie_name="asap_session_"+str(server.server_port)
-    oauth_cookie='asap_linkedin_'+str(server.server_port)
-    server.linkedin_oauth=linkedin_oauth
-    server.runtime=runtime;server.devtools=devtools
+    Handler.db=Path(db)
+    Handler.config_path=config_path
+    Handler.runtime=runtime
+    Handler.devtools=devtools
+    Handler.linkedin_oauth=linkedin_oauth
+    def set_port(value):
+        nonlocal cookie_name, oauth_cookie
+        cookie_name='asap_session_'+str(value)
+        oauth_cookie='asap_linkedin_'+str(value)
+    Handler.set_port=staticmethod(set_port)
+    return Handler
+
+
+def make_server(db,password,host='127.0.0.1',port=5000,runtime=None,dev_enabled=False,linkedin_oauth=None):
+    """Compatibility entry point for existing HTTP tests and local tools."""
+    handler=make_handler(db,password,host,port,runtime,dev_enabled,linkedin_oauth)
+    server=ThreadingHTTPServer((host,port),handler)
+    handler.set_port(server.server_port)
+    server.linkedin_oauth=handler.linkedin_oauth
+    server.runtime=runtime;server.devtools=handler.devtools
     return server
