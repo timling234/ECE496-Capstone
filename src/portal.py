@@ -288,8 +288,14 @@ def create_app(db, password, runtime=None, *, start_workers=False, google=None, 
                 raise ValueError('Authorization declined')
             if provider=='bluesky' and len(request.args.getlist('iss'))!=1:
                 raise ValueError('Missing issuer')
+            # Strict legacy cookies are absent during a cross-site redirect.
+            # Reissue the same verified session as Lax so the following Sources
+            # navigation retains login; CSRF remains required for every mutation.
+            legacy_cookie = Adapter(pending['workspace']).oauth_session_cookie(pending['session']) if pending['owner'] is None else None
             social.complete(pending,request.args['code'],request.args.get('iss',''))
             response = redirect('/admin?view=sources&notice=Account+connected.+Automatic+polling+remains+off+for+new+sources.',303)
+            if legacy_cookie:
+                response.headers.add('Set-Cookie',legacy_cookie)
         except Exception:
             response = document('Connection unsuccessful','<p>The connection was declined, expired, or could not be verified. Return to Sources to start again. Bluesky Authenticate currently supports bsky.social hosted accounts.</p><a href="/admin?view=sources">Back to Sources</a>',400)
         response.delete_cookie('asap_connect_'+provider,path='/'+provider+'/callback')

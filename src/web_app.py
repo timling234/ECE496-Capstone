@@ -116,6 +116,14 @@ def make_handler(db,password,host='127.0.0.1',port=5000,runtime=None,dev_enabled
             session=sessions.get(token)
             if session and session['expires']>time.time(): return session
             sessions.pop(token,None); return None
+        def oauth_session_cookie(self, session):
+            # Recover only the exact existing session bound to a verified OAuth
+            # state + callback nonce. Keep the bearer and original expiry.
+            for token, current in sessions.items():
+                if current is session and current.get('authenticated') and current['expires']>time.time():
+                    remaining=int(current['expires']-time.time())
+                    return cookie_name+'='+token+cookie_secure+'; HttpOnly; SameSite=Lax; Path=/; Max-Age='+str(remaining)
+            raise ValueError('Original administrator session expired')
         def db_connection(self): return sqlite3.connect(self.db,timeout=10)
         def do_GET(self):
             parsed=urlparse(self.path); route=parsed.path

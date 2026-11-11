@@ -111,6 +111,7 @@ class Credentials:
             raise ValueError('LinkedIn did not grant the required Page permissions')
         connection = secrets.token_hex(16)
         value = dict(payload)
+        value['authenticated_at'] = self.clock()
         value['expires_at'] = self.clock() + int(payload['expires_in'])
         value['refresh_expires_at'] = self.clock() + int(payload.get('refresh_token_expires_in', 0))
         self.save(connection, value)

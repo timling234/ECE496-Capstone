@@ -71,3 +71,20 @@ Protocol references:
 - [AT Protocol OAuth specification](https://atproto.com/specs/oauth)
 - [AT Protocol OAuth patterns](https://atproto.com/guides/oauth-patterns)
 - [Bluesky official Python cookbook](https://github.com/bluesky-social/cookbook/tree/main/python-oauth-web-app)
+
+
+## Return to Sources and authentication badges
+
+A verified social callback reissues the existing legacy administrator bearer as an
+HttpOnly Lax cookie with its original remaining lifetime. This retains login on
+the redirect to Sources when the original Strict cookie was withheld by a browser;
+portal accounts keep their existing login binding. No new session or extended
+expiry is created, and every mutation still requires CSRF. Invalid callbacks,
+wrong nonces, expired/logged-out sessions and replay cannot restore a login.
+
+Authentication badges are based only on each workspace's local grant records.
+Authenticated is green and independent of polling being Disabled. Missing/expired
+or revoked grants show Reconnect required; plain public Bluesky sources show Public
+access. Checking a badge makes no provider requests or token refreshes. Fresh
+reauthentication supersedes older fetch-authentication errors; current errors still
+require reconnect. Connected rows offer Re-authenticate.

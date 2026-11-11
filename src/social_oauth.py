@@ -219,6 +219,7 @@ class SocialOAuth:
             label = str(user.get('username') or account)[:256]
             credentials = XCredentials(pending['workspace'].db.parent/'x_credentials')
             payload['expires_at'] = self.clock()+int(payload['expires_in'])
+            payload['authenticated_at'] = self.clock()
         else:
             if issuer!=BSKY:
                 raise ValueError('Bluesky authorization issuer did not match')

@@ -10,6 +10,7 @@ from run_polling import load_sources
 from .polling import poll_due, PollingSource
 from .store_poc import ROOT
 from .source_config import identity
+from .source_auth import authentication
 
 
 class AppRuntime:
@@ -126,6 +127,7 @@ class AppRuntime:
         for source in config['sources']:
             platform=source['platform'];key=platform+':'+source.get('account','')
             row=dict(source);row.update(states.get(key,{}))
+            row['authentication']=authentication(row,self.config_path.parent)
             row['status']=('Not connected' if platform=='linkedin' and not source.get('connection_id') else 'Reconnect LinkedIn' if platform=='linkedin' and (row.get('error_code')==401 or row.get('error_type')=='ReconnectRequired') else 'Fetching' if self.active==key
                 else 'Queued' if key in self.pending else 'Error' if row.get('error_type')
                 else 'Disabled' if not source.get('enabled') else 'Healthy' if row.get('last_success_at') is not None else 'Waiting')

@@ -243,6 +243,32 @@ class SocialTests(unittest.TestCase):
         self.assertEqual(runtime.read_config()['sources'][-1]['connection_id'],connection)
         self.assertEqual(len(runtime.read_config()['sources']),2)
 
+    def test_legacy_cross_site_callback_restores_exact_original_login(self):
+        client=self.app.test_client()
+        client.post('/login',data=dict(csrf=csrf(client.get('/login')),password='admin'))
+        original=client.get_cookie('asap_session_5000').value
+        state,_=self.start(client,'x')
+        # Simulate the browser withholding its Strict login cookie on return
+        # from X, but sending the dedicated Lax callback nonce.
+        client.delete_cookie('asap_session_5000')
+        result=self.callback(client,'x',state)
+        self.assertEqual(result.status_code,303)
+        cookie=client.get_cookie('asap_session_5000')
+        self.assertEqual(cookie.value,original)
+        self.assertEqual(cookie.same_site,'Lax');self.assertTrue(cookie.http_only)
+        self.assertIn('Max-Age=287',result.headers.getlist('Set-Cookie')[0])
+        landing=client.get(result.location)
+        self.assertEqual(landing.status_code,200)
+        self.assertIn(b'ASAP Admin',landing.data)
+        self.assertIn(b'class="badge good">Authenticated',landing.data)
+        self.assertIn(b'Re-authenticate',landing.data)
+        self.assertIn(b'Disabled',landing.data)
+        self.assertEqual(client.post('/source-toggle',data={'csrf':'bad','source_key':'x:12345'}).status_code,403)
+        # A replay cannot issue another session cookie.
+        replay=self.callback(client,'x',state)
+        self.assertEqual(replay.status_code,400)
+        self.assertFalse(any(h.startswith('asap_session_5000=') for h in replay.headers.getlist('Set-Cookie')))
+
     def test_legacy_administrator_connection_and_logout(self):
         client=self.app.test_client()
         client.post('/login',data=dict(csrf=csrf(client.get('/login')),password='admin'))
