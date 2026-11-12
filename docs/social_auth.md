@@ -128,3 +128,8 @@ account; choosing an already-connected account reuses its row rather than making
 a duplicate. New LinkedIn workspaces' original placeholder is reused. Source edits
 keep the settings-only form. The older saved-grant restore endpoint remains
 server-validated, but it is no longer a prerequisite to adding a platform row.
+
+Source rows support a workspace-local `name` (1–80 characters), defaulting to
+`x`, `bluesky`, or `linkedin`. Edit it through the row pencil / Source name field.
+Names affect the management label only; identity, account, grants, polling state
+and stored posts remain separate. Draft names survive authentication.

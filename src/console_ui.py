@@ -74,7 +74,7 @@ def render_console(posts,history,settings,config,session,view,esc,card,runtime=N
             remove='<form method="post" action="/source-remove"><input type="hidden" name="csrf" value="'+csrf+'"><input type="hidden" name="source_key" value="'+esc(key)+'"><button aria-label="Remove source" title="Remove source">&#10006;&#65038;</button></form>'
             if s.get('authentication')!='Authenticated':
                 actions+=form('/'+platform+'/connect',{'source_key':key},'Re-authenticate' if s.get('authentication')=='Reconnect required' else 'Authenticate')
-            body+='<tr><td><a aria-label="Edit '+esc(platform)+' '+esc(s.get('account',''))+'" href="/admin?view=sources&amp;edit_source='+quote(key,safe='')+'">✎</a> <b>'+esc(platform)+'</b><br><small>'+esc(s.get('label') or s.get('account') or 'Not connected')+'</small></td><td>'+badge(s.get('authentication','Public access' if platform=='bluesky' else 'Not authenticated'))+'<br><small>'+esc(s['status'])+'</small></td><td>'+('Enabled' if s.get('enabled') else 'Disabled')+'<br>'+esc(s.get('interval_seconds') or 1800)+' sec</td><td>'+esc(stamp(s.get('last_attempt_at')))+'<br><small>Success: '+esc(stamp(s.get('last_success_at')))+'</small></td><td>'+str(s.get('fetched_count',0))+' fetched / '+str(s.get('new_count',0))+' new</td><td>'+esc(error)+'<br><small>'+esc(stamp(s.get('next_poll_at')) if s.get('next_poll_at') else '—')+'</small></td><td class="source-actions">'+actions+'</td><td class="source-delete">'+remove+'</td></tr>'
+            body+='<tr><td><a aria-label="Edit '+esc(platform)+' '+esc(s.get('account',''))+'" href="/admin?view=sources&amp;edit_source='+quote(key,safe='')+'">✎</a> <b>'+esc(s.get('name') or platform)+'</b><br><small>'+esc(s.get('label') or s.get('account') or 'Not connected')+'</small></td><td>'+badge(s.get('authentication','Public access' if platform=='bluesky' else 'Not authenticated'))+'<br><small>'+esc(s['status'])+'</small></td><td>'+('Enabled' if s.get('enabled') else 'Disabled')+'<br>'+esc(s.get('interval_seconds') or 1800)+' sec</td><td>'+esc(stamp(s.get('last_attempt_at')))+'<br><small>Success: '+esc(stamp(s.get('last_success_at')))+'</small></td><td>'+str(s.get('fetched_count',0))+' fetched / '+str(s.get('new_count',0))+' new</td><td>'+esc(error)+'<br><small>'+esc(stamp(s.get('next_poll_at')) if s.get('next_poll_at') else '—')+'</small></td><td class="source-actions">'+actions+'</td><td class="source-delete">'+remove+'</td></tr>'
         body+='</table></div></section>'
         edit_key=query.get('edit_source',[''])[0]
         adding=query.get('source_form',[''])[0]=='add'
@@ -89,6 +89,7 @@ def render_console(posts,history,settings,config,session,view,esc,card,runtime=N
             else:
                 platform=source['platform'];draft=source.get('draft') or not source.get('account')
                 body+='<section class="panel source-editor"><h2>Edit Source</h2><p>'+provider_icon(platform)+' '+esc(platform.title() if platform!='x' else 'X')+'</p><form method="post" action="/source-save"><input type="hidden" name="csrf" value="'+csrf+'"><input type="hidden" name="provider" value="'+platform+'"><input type="hidden" name="source_key" value="'+esc(edit_key)+'">'
+                body+='<label>Source name <input type="text" name="name" maxlength="80" value="'+esc(source.get('name') or platform)+'" required></label>'
                 body+='<p>Connected account: <b>'+esc(source.get('label') or source.get('account') or 'Not connected')+'</b></p>'
                 if draft:body+='<p>Authenticate this source using its row action before enabling polling.</p>'
                 body+='<label>Polling interval <input type="number" name="interval_seconds" min="'+('1800' if platform=='linkedin' else '1')+'" max="31536000" value="'+str(source.get('interval_seconds') or 1800)+'"> seconds</label><label><input type="checkbox" name="enabled" '+('checked' if source.get('enabled') else '')+' '+('disabled' if draft else '')+'>Automatic polling</label>'
@@ -133,9 +134,6 @@ def render_console(posts,history,settings,config,session,view,esc,card,runtime=N
             body+='<h3>Download a local model</h3><p>Downloads use Server disk space and internet bandwidth. After completion, choose the model above and apply it.</p><form method="post" action="/llm/download"><input type="hidden" name="csrf" value="'+csrf+'"><select name="model" required>'
             body+=''.join('<option value="'+esc(name)+'">'+esc(label)+(' · Installed' if name in ai['installed'] else '')+'</option>' for name,label in ai['catalog'].items())+'</select><button>Download</button></form>'
             for name,status,progress,error in ai['downloads']:body+='<p>'+esc(name)+' · '+esc(status)+' · '+str(progress)+'% '+esc(error or '')+'</p>'
-            body+='<h3>Automatic review history</h3>'
-            for action,reason,actor,when,platform,post_id in ai['audit']:body+='<p><b>'+esc(action)+'</b> · '+esc(platform)+' · '+esc(stamp(when))+' · '+esc(actor)+'<br>'+esc(reason)+'</p>'
-            if not ai['audit']:body+='<p>No automatic decisions yet.</p>'
             body+='</section>'
         from .notifications import smtp_ready
         notify=notification_config or dict(enabled=0,channel='email',recipient='')

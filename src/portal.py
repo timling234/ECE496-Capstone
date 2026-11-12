@@ -17,6 +17,7 @@ from urllib.parse import urlencode
 from flask import Flask, Response, abort, g, redirect, request
 from werkzeug.middleware.proxy_fix import ProxyFix
 from .accounts import Accounts
+from .dev_tools import DevTools
 from .google_login import GoogleLogin
 from .linkedin import Credentials, OAuth
 from .web_app import make_handler, page, esc
@@ -233,6 +234,11 @@ def create_app(db, password, runtime=None, *, start_workers=False, google=None, 
             self.db, self.runtime, self.linkedin_oauth = workspace.db, workspace.runtime, workspace.oauth
             self.config_path = workspace.runtime.config_path if workspace.runtime else workspace.db.parent / 'polling.local.json'
             self.devtools = None
+            if workspace.runtime and request.path in ('/admin','/dev-task'):
+                with cache_lock:
+                    if not hasattr(workspace,'devtools'):
+                        workspace.devtools=DevTools(workspace.runtime,enabled=True)
+                    self.devtools=workspace.devtools
             self.ai_ready = reviewer.model.ready
             self.ai_config = reviewer.config(workspace.db)
             self.ai_panel = None
@@ -245,9 +251,8 @@ def create_app(db, password, runtime=None, *, start_workers=False, google=None, 
                     initialize_ai(conn)
                     batches=conn.execute('SELECT id,status,mode,total,done,applied,error FROM ai_batches ORDER BY id DESC LIMIT 5').fetchall()
                     downloads=conn.execute('SELECT model,status,progress,error FROM ai_model_downloads ORDER BY id DESC LIMIT 5').fetchall()
-                    audit=conn.execute('SELECT action,reason,actor,created_at,platform,post_id FROM ai_automation_actions ORDER BY id DESC LIMIT 20').fetchall()
                     conn.commit()
-                self.ai_panel=dict(config=self.ai_config,installed=installed,catalog=CATALOG,error=model_error,batches=batches,downloads=downloads,audit=audit)
+                self.ai_panel=dict(config=self.ai_config,installed=installed,catalog=CATALOG,error=model_error,batches=batches,downloads=downloads)
 
             self.feed_url = request.host_url.rstrip('/') + ('/u/'+g.user['id']+'/feed' if g.user else '/feed')
             self.path = request.full_path.rstrip('?')

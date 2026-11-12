@@ -12,7 +12,7 @@ def remember(source, directory):
     except (ValueError,OSError):return
     if not isinstance(grant,dict):return
     accounts=grant.setdefault('source_accounts',{})
-    accounts[source['account']]={k:source[k] for k in ('platform','account','authorized_account','label','connection_id') if k in source}
+    accounts[source['account']]={k:source[k] for k in ('platform','account','authorized_account','label','connection_id','name') if k in source}
     credentials.save(source['connection_id'],grant)
 
 

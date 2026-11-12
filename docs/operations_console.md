@@ -62,3 +62,11 @@ The repository uses an existing bearer-token file for read ingestion; it has no 
 - Real publisher/E2E verification is **pending local test credentials**: neither an explicit test handle nor app password was available in the agent's environment/local ignored configuration. Mocked tests prove code paths, not real posting permission. LinkedIn remains an unrelated external API-access blocker.
 
 Production hosting/Docker verification and unrelated FR closure work remain separate. No commit or push was performed.
+
+## Portal defaults — 2026-11-11
+
+Development tools are enabled for every signed-in workspace in the Flask portal.
+Jobs, source retrieval and run history use that workspace; opening the page does
+not run tests or contact providers. Authentication and CSRF remain required.
+Bluesky E2E performs one explicit fetch without automatic indexing retries.
+The legacy standalone server still accepts its explicit developer-tools flag.

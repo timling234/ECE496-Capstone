@@ -233,10 +233,12 @@ def make_handler(db,password,host='127.0.0.1',port=5000,runtime=None,dev_enabled
                         account=value('organization')
                         source=find_source(config,'linkedin:'+account)
                         if source is None:
-                            # Replace the old unconnected placeholder, if present.
-                            config['sources']=[s for s in config['sources'] if not (s['platform']=='linkedin' and not s.get('account'))]
+                            source=find_source(config,'linkedin:')
+                        if source is None:
                             source=dict(platform='linkedin',account=account)
                             config['sources'].append(source)
+                        source['account']=account
+                        source.pop('draft',None)
                         source.update(connection_id=choice['connection'],label=choice['pages'][account],
                                       enabled=False,interval_seconds=1800,page_size=100)
                         config['sources']=[s for s in config['sources'] if not (s['platform']=='linkedin' and not s.get('account'))]
@@ -290,7 +292,7 @@ def make_handler(db,password,host='127.0.0.1',port=5000,runtime=None,dev_enabled
                     with self.runtime.lock:
                         config=self.read_config();key=value('source_key') or None
                         existing=find_source(config,key) if key else None
-                        fields={k:value(k) for k in ('provider','account','interval_seconds','enabled','page_size')}
+                        fields={k:value(k) for k in ('provider','account','interval_seconds','enabled','page_size','name')}
                         if key:
                             if existing is None:raise ValueError('Source not found')
                             if value('account') and value('account')!=existing.get('account',''):raise ValueError('Connected account cannot be changed')
@@ -302,6 +304,7 @@ def make_handler(db,password,host='127.0.0.1',port=5000,runtime=None,dev_enabled
                             existing={k:v for k,v in selected.items() if k!='connection_ref'}
                             config['sources'].append(existing);key=identity(existing)
                             fields['account']=existing.get('account','')
+                        if 'name' not in data:fields['name']=existing.get('name',existing['platform'])
                         configure_source(config,fields,key)
                         self.runtime.save_config(config)
                 except ValueError as exc:return self.send(400,page('Invalid source configuration',esc(exc)))

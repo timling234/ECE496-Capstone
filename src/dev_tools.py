@@ -148,15 +148,11 @@ class DevTools:
                 result=self.publisher.publish(text)
                 output=json.dumps(result)
                 if test_id=='e2e-bluesky':
-                    deadline=time.monotonic()+60;found=False
-                    while time.monotonic()<deadline:
-                        outcome=self.runtime.fetch_now('bluesky:'+credentials()[0])
-                        with closing(sqlite3.connect(self.db)) as conn:
-                            row=conn.execute("SELECT p.text,r.status FROM posts p JOIN relevance r USING(platform,post_id) WHERE p.platform='bluesky' AND p.post_id=?",(result['uri'],)).fetchone()
-                        if row==(text,'candidate'):found=True;break
-                        if outcome.get('status')=='error':break
-                        time.sleep(2)
-                    output+='\n'+('PASS: unique post stored as review candidate; no automatic approval.' if found else 'FAIL: candidate not visible within 60 seconds; indexing may be delayed.')
+                    self.runtime.fetch_now('bluesky:'+credentials()[0])
+                    with closing(sqlite3.connect(self.db)) as conn:
+                        row=conn.execute("SELECT p.text,r.status FROM posts p JOIN relevance r USING(platform,post_id) WHERE p.platform='bluesky' AND p.post_id=?",(result['uri'],)).fetchone()
+                    found=row==(text,'candidate')
+                    output+='\n'+('PASS: unique post stored as review candidate; no automatic approval.' if found else 'FAIL: candidate not visible after one fetch; indexing may be delayed. No automatic retry.')
                     if not found:status='FAIL'
         except subprocess.TimeoutExpired as error:
             status='TIMEOUT';output='Regression timeout after '+str(self.timeout)+' seconds. '

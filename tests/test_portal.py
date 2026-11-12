@@ -212,6 +212,30 @@ class PortalTests(unittest.TestCase):
         self.assertIn(b'Mock website for testing purpose',demo.data)
         with self.a.get('/assets/demo-chart.svg') as asset:self.assertEqual(asset.status_code,200)
 
+    def test_source_names_and_development_tools_are_workspace_local(self):
+        alice=self.register(self.a,'named-source@example.com');bob=self.register(self.b,'other-dev@example.com')
+        self.post(self.a,'/source-add',dict(provider='x'))
+        config=self.workspaces.get(alice['id']).runtime.read_config()
+        self.assertEqual(next(s for s in config['sources'] if s['platform']=='x')['name'],'x')
+        fields=dict(provider='x',source_key='x:',name='<Our X>',interval_seconds=1800,page_size=5)
+        self.assertEqual(self.post(self.a,'/source-save',fields).status_code,303)
+        self.assertIn(b'&lt;Our X&gt;',self.a.get('/admin?view=sources').data)
+        self.assertNotIn(b'&lt;Our X&gt;',self.b.get('/admin?view=sources').data)
+        self.assertEqual(self.post(self.a,'/source-save',dict(fields,name='x'*81)).status_code,400)
+        self.assertIn(b'Source name',self.a.get('/admin?view=sources&edit_source=x%3A').data)
+        for client in (self.a,self.b):
+            tools=client.get('/admin?view=testing')
+            self.assertIn(b'Offline Regression',tools.data)
+            self.assertNotIn(b'Development tools disabled',tools.data)
+        ta=self.workspaces.get(alice['id']).devtools;tb=self.workspaces.get(bob['id']).devtools
+        self.assertIsNot(ta,tb);ta.submit=Mock(return_value='fixture-job')
+        self.assertEqual(self.post(self.a,'/dev-task',dict(test_id='store')).status_code,303)
+        ta.submit.assert_called_once_with('store','')
+        self.assertEqual(self.app.test_client().post('/dev-task',data={'test_id':'store'}).status_code,403)
+        self.assertEqual(self.a.post('/dev-task',data={'csrf':'bad','test_id':'store'}).status_code,403)
+        self.app.extensions['models'].installed=Mock(return_value={})
+        self.assertNotIn(b'Automatic review history',self.a.get('/admin?view=settings').data)
+
     def google_begin(self, client):
         response = client.get('/auth/google')
         self.assertEqual(response.status_code, 303)

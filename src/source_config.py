@@ -17,6 +17,8 @@ def configure_source(config, fields, key=None):
     if key and existing is None:raise ValueError('Source not found; refresh this page')
     platform=existing['platform'] if existing else fields.get('provider','')
     if platform not in ('x','bluesky','linkedin'):raise ValueError('Unsupported provider')
+    name=fields.get('name',(existing or {}).get('name',platform)).strip() or platform
+    if len(name)>80 or any(ord(c)<32 for c in name):raise ValueError('Source name must contain 1–80 characters on one line')
     enabled=fields.get('enabled')=='on'
     if existing and existing.get('connection_id') and fields.get('account','').strip()!=existing.get('account'):
         raise ValueError('Authenticate another account to change this connected source')
@@ -29,7 +31,7 @@ def configure_source(config, fields, key=None):
         if account:raise ValueError('Authenticate to select this source account')
         if not (5 if platform=='x' else 1)<=page_size<=100:raise ValueError('Invalid posts per request')
         if platform=='linkedin' and interval<1800:raise ValueError('LinkedIn polling must be at least 1800 seconds')
-        existing.update(enabled=False,interval_seconds=interval,page_size=page_size)
+        existing.update(name=name,enabled=False,interval_seconds=interval,page_size=page_size)
         return existing
     if platform=='linkedin':
         if not existing or not existing.get('connection_id'):
@@ -41,7 +43,7 @@ def configure_source(config, fields, key=None):
     elif platform=='x':XProvider(account,page_size=page_size)
     else:BlueskyProvider(account,page_size=page_size)
     replacement=dict(existing or {})
-    replacement.update(platform=platform,account=account,enabled=enabled,interval_seconds=interval)
+    replacement.update(name=name,platform=platform,account=account,enabled=enabled,interval_seconds=interval)
     if page_size is not None:replacement['page_size']=page_size
     new_key=identity(replacement)
     if any(identity(s)==new_key and s is not existing for s in config['sources']):raise ValueError('This provider/account is already configured')
@@ -59,5 +61,6 @@ def add_platform(config,platform):
         draft=dict(platform=platform,account='',enabled=False,interval_seconds=1800,page_size=5)
         config['sources'].append(draft)
     draft.setdefault('account','')
+    draft.setdefault('name',platform)
     draft.update(draft=True,enabled=False)
     return draft

@@ -50,3 +50,6 @@ until project handover. User-facing wording uses “Server”.
 Console forms show success/error notifications over the current page. Background
 progress updates use authenticated same-origin page reads; they never trigger
 provider retrieval or model inference. Updates pause while editing a form.
+
+Settings no longer displays the automatic review history list. Audit records
+remain stored; per-post reasons and review batch progress remain available.
