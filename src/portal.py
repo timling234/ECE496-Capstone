@@ -108,7 +108,7 @@ def create_app(db, password, runtime=None, *, start_workers=False, google=None, 
         response.headers['Referrer-Policy'] = 'no-referrer'
         response.headers.setdefault('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; img-src https: http:; form-action 'self' https://www.linkedin.com https://x.com https://bsky.social; base-uri 'none'; frame-src 'self'; script-src 'self'; connect-src 'self'")
         if not request.path.endswith('/feed'):
-            response.headers['X-Frame-Options'] = 'DENY'
+            response.headers['X-Frame-Options'] = 'SAMEORIGIN' if request.path.endswith('/embed-demo') or request.path=='/demo-feed' else 'DENY'
         if secure:
             response.headers['Strict-Transport-Security'] = 'max-age=31536000'
         if g.get('new_cookie'):
@@ -268,6 +268,17 @@ def create_app(db, password, runtime=None, *, start_workers=False, google=None, 
                 self.response.headers.add('Set-Cookie', cookie)
             return self.response
 
+    @app.get('/demo-feed')
+    def demo_feed():
+        from .demo_content import sample_posts
+        from .feed_ui import feed_body,appearance_overrides
+        from .web_app import safe_url
+        settings=dict(accent='#215e95',font_size=14,show_origin=1)
+        settings.update(appearance_overrides({k:request.args.getlist(k) for k in request.args}))
+        body='<p class="demo-banner"><b>Mock website for testing purpose</b> · Fictional samples, not published posts.</p>'
+        body+=feed_body(sample_posts(request.host_url.rstrip('/')),settings,esc,safe_url)
+        return Response(page('ASAP sample feed',body,settings),content_type='text/html; charset=utf-8')
+
     @app.get('/console.js')
     def console_script():
         return Response(Path(__file__).with_name('console.js').read_text(), content_type='text/javascript; charset=utf-8')
@@ -283,7 +294,9 @@ def create_app(db, password, runtime=None, *, start_workers=False, google=None, 
         throttle('ai-review:'+str(g.user['id'] if g.user else 'admin'),3,60)
         try:
             reviewer.submit(workspace.db,request.form.get('platform',''),request.form.get('post_id',''),g.user['id'] if g.user else 'admin')
-            return redirect('/admin?view=pending&notice=AI+review+started.+Results+update+automatically.',303)
+            view=request.form.get('return_view','pending')
+            if view not in ('approved','pending','rejected'):view='pending'
+            return redirect('/admin?'+urlencode(dict(view=view,notice='AI review started. Results update automatically.')),303)
         except ValueError as exc:
             return document('AI review unavailable','<p>'+esc(exc)+'</p><a href="/admin?view=pending">Back to review queue</a>',400)
 
@@ -380,12 +393,12 @@ def create_app(db, password, runtime=None, *, start_workers=False, google=None, 
         except ValueError:
             abort(404)
         handler = Adapter(workspace)
-        handler.path = '/feed' if request.path.endswith('/feed') else '/embed-demo'
+        handler.path = ('/feed' if request.path.endswith('/feed') else '/embed-demo')+('?' + request.query_string.decode('ascii',errors='ignore') if request.query_string else '')
         # Public feeds must not inherit an authenticated viewer's workspace context.
         handler.do_GET()
         response = handler.response
         if request.path.endswith('/embed-demo'):
-            response.set_data(response.get_data().replace(b'src="/feed"', ('src="/u/' + uid + '/feed"').encode()))
+            response.set_data(response.get_data().replace(b'src="/feed', ('src="/u/' + uid + '/feed').encode()))
         return response
 
     @app.route('/<path:path>', methods=['GET', 'POST'])

@@ -56,3 +56,14 @@ See tests/test_notifications.py and tests/test_integration_ui.py for candidate/r
 99 tests pass locally and inside the Python 3.12 Linux Docker image. Docker image build, non-root UID 10001, isolated web/worker startup, approved-state volume persistence across restart, and exclusion of token files/local databases from `/app` verified. Compose configuration validation passed. Browser verified the News iframe, Pin retaining Published, notification opt-in/address save and SMS disabled. This supersedes earlier Docker-engine-unavailable notes: the user started the engine and build/run verification was completed. Final public hosting/install and real SMTP inbox receipt remain external configuration/deployment work. No emails sent to a real recipient; no commits/pushes.
 
 For HTTPS deployment set `ASAP_COOKIE_SECURE=1` so admin session cookies carry Secure. Keep 0 for loopback HTTP testing. The HTTPS proxy must permit only the intended public routes and preserve admin framing denial.
+
+## Stage 4 update — 2026-11-11
+
+The hosted portal now includes `/admin?view=mock` inside its workspace shell.
+See [integration candidate](integration/README.md) for the current MSRG patch,
+Thomas's confirmed requirements, responsive demo controls and appearance URL
+parameters. The earlier localhost/LinkedIn-pending descriptions above are historic.
+ASAP is hosted at `https://asap.surf`; integration uses the intended user's
+`/u/<workspace-id>/feed`. No change has been installed in the MSRG repository.
+Published editorial actions and individual AI review retain their originating
+Published view. Withdrawal/rejection still removes publication eligibility.

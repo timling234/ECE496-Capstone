@@ -34,6 +34,7 @@
     if (!main()) return;
     const active = main().dataset.busy === 'true';
     const view = new URL(location.href).searchParams.get('view') || 'dashboard';
+    if (view === 'mock') return;
     if (active || ['dashboard', 'sources', 'pending', 'testing', 'approved', 'rejected'].includes(view))
       timer = setTimeout(refresh, active ? 3000 : 15000);
   }
@@ -51,6 +52,35 @@
     } catch (_) { /* Preserve the page through temporary connection failures. */ }
     finally { busy = false; schedule(); }
   }
+  function updateMock() {
+    const controls = document.querySelector('.mock-controls');
+    if (!controls) return;
+    const height = Math.round(Math.max(320, Math.min(1000, Number(document.getElementById('mock-height').value) || 620)));
+    const width = document.getElementById('mock-width').value;
+    const demo = new URL(controls.dataset.demoUrl, location.origin);
+    demo.searchParams.set('sample', document.getElementById('mock-content').value === 'sample' ? '1' : '0');
+    demo.searchParams.set('template', document.getElementById('mock-template').value);
+    demo.searchParams.set('theme', document.getElementById('mock-theme').value);
+    demo.searchParams.set('height', height);
+    document.getElementById('mock-viewport').style.width = width + 'px';
+    const feed = new URL(controls.dataset.feedUrl);
+    const appearance = {accent: document.getElementById('mock-accent').value, font_size: Math.round(Math.max(12, Math.min(24, Number(document.getElementById('mock-font').value) || 16))), show_origin: document.getElementById('mock-origin').checked ? '1' : '0'};
+    for (const [key, value] of Object.entries(appearance)) { demo.searchParams.set(key, value); feed.searchParams.set(key, value); }
+    document.getElementById('mock-open').href = demo.href;
+    const frame = document.getElementById('mock-frame'); frame.src = demo.href; frame.style.height = (height + 680) + 'px';
+    const code = document.getElementById('mock-code');
+    const embed = document.createElement('iframe'); embed.src = feed.href; embed.title = 'ASAP news'; embed.loading = 'lazy';
+    embed.setAttribute('style', 'display:block;width:100%;height:' + height + 'px;border:0;border-radius:12px');
+    code.value = embed.outerHTML;
+  }
+  document.addEventListener('change', event => { if (event.target.closest('.mock-controls')) updateMock(); });
+  document.addEventListener('click', async event => {
+    const button = event.target.closest('[data-copy]');
+    if (!button) return;
+    const field = document.getElementById(button.dataset.copy);
+    try { await navigator.clipboard.writeText(field.value); toast('Embed code copied.'); }
+    catch (_) { field.focus(); field.select(); toast('Code selected. Copy it using your keyboard.', true); }
+  });
   document.addEventListener('input', e => { if (e.target.closest('main form')) dirty = true; });
   document.addEventListener('change', e => { if (e.target.closest('main form')) dirty = true; });
   document.addEventListener('submit', async event => {

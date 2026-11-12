@@ -1,0 +1,22 @@
+--- a/layouts/index.html
++++ b/layouts/index.html
+@@ -3,6 +3,7 @@
+   {{ $publicationSection := site.GetPage "/publications" }}
+   {{ $recentPubs := first 6 (sort $publicationSection.RegularPages "Params.year" "desc") }}
+   {{ $newsApp := site.Params.news.elfsight_app_id }}
++  {{ $asapFeed := site.Params.news.asap_feed_url }}
+ 
+   <section class="hero hero-home">
+     <div class="hero-home-stage">
+@@ -61,7 +62,10 @@
+         <h2>News</h2>
+       </div>
+       <div class="content-panel news-panel">
+-        {{ if $newsApp }}
++        {{ if $asapFeed }}
++          <iframe src="{{ $asapFeed }}" title="Approved MSRG news" loading="lazy"
++            style="display:block;width:100%;height:620px;border:0;border-radius:12px"></iframe>
++        {{ else if $newsApp }}
+           <script src="https://static.elfsight.com/platform/platform.js" async></script>
+           <div class="elfsight-app-{{ $newsApp }}" data-elfsight-app-lazy></div>
+         {{ end }}

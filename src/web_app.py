@@ -16,7 +16,7 @@ from urllib.parse import parse_qs, urlparse
 from .console_ui import render_console, STYLE
 from .dev_tools import DevTools
 from . import notifications
-from .feed_ui import feed_body, mock_body
+from .feed_ui import feed_body, mock_body, appearance_overrides
 from .source_config import configure_source, find_source, identity, add_platform
 from .source_connections import choices
 from .linkedin import OAuth, Credentials
@@ -66,7 +66,7 @@ def card(p,csrf=None,show_origin=True,return_view="pending"):
             else:body+='<p><small>AI review in progress…</small></p>'
         if p.get('ai_available'):
             running=review and review['status']=='running'
-            body+='<form method="post" action="/llm/suggest"><input type="hidden" name="csrf" value="'+csrf+'"><input type="hidden" name="platform" value="'+esc(p['platform'])+'"><input type="hidden" name="post_id" value="'+esc(p['post_id'])+'"><button '+('disabled' if running else '')+'>AI review suggestion</button></form>'
+            body+='<form method="post" action="/llm/suggest"><input type="hidden" name="csrf" value="'+csrf+'"><input type="hidden" name="return_view" value="'+esc(return_view)+'"><input type="hidden" name="platform" value="'+esc(p['platform'])+'"><input type="hidden" name="post_id" value="'+esc(p['post_id'])+'"><button '+('disabled' if running else '')+'>AI review suggestion</button></form>'
         actions=['reject']
         if p['candidate_status']=='candidate': actions.insert(0,'approve')
         if p['editorial_status']=='approved': actions=['withdraw','reject','unpin' if p['pinned'] else 'pin']
@@ -77,7 +77,7 @@ def card(p,csrf=None,show_origin=True,return_view="pending"):
                 body+='<input type="hidden" name="'+name+'" value="'+esc(value)+'">'
             body+='<button>'+label+'</button></form>'
     if csrf and p['platform']=='manual':
-        body+='<details><summary>Edit announcement</summary><form method="post" action="/edit"><input type="hidden" name="csrf" value="'+csrf+'"><input type="hidden" name="post_id" value="'+esc(p['post_id'])+'"><textarea name="text" maxlength="10000" required>'+esc(p['text'])+'</textarea><button>Save edit (requires review)</button></form></details>'
+        body+='<details><summary>Edit announcement</summary><form method="post" action="/edit"><input type="hidden" name="return_view" value="'+esc(return_view)+'"><input type="hidden" name="csrf" value="'+csrf+'"><input type="hidden" name="post_id" value="'+esc(p['post_id'])+'"><textarea name="text" maxlength="10000" required>'+esc(p['text'])+'</textarea><button>Save edit (requires review)</button></form></details>'
     return body+'</article>'
 
 def make_handler(db,password,host='127.0.0.1',port=5000,runtime=None,dev_enabled=False,linkedin_oauth=None):
@@ -168,10 +168,11 @@ def make_handler(db,password,host='127.0.0.1',port=5000,runtime=None,dev_enabled
                 return self.send(200,page('Admin sign in','<form method="post" action="/login"><input type="hidden" name="csrf" value="'+sessions[token]['csrf']+'"><label>Password <input type="password" name="password" required autocomplete="current-password"></label><button>Sign in</button></form>'),
                     cookie_name+'='+token+cookie_secure+'; HttpOnly; SameSite=Strict; Path=/; Max-Age=600')
             if route=='/embed-demo':
-                return self.send(200,page('Mock Website',mock_body()))
+                return self.send(200,page('Mock Website',mock_body(parse_qs(parsed.query))))
             if route=='/feed':
                 with closing(self.db_connection()) as conn:
                     posts=publishable(conn); settings=presentation(conn)
+                settings.update(appearance_overrides(parse_qs(parsed.query)))
                 return self.send(200,page('MSRG / ASAP Feed',feed_body(posts,settings,esc,safe_url),settings))
             session=self.session()
             if not session or not session['authenticated']: return self.redirect('/login')
@@ -339,7 +340,9 @@ def make_handler(db,password,host='127.0.0.1',port=5000,runtime=None,dev_enabled
                         elif route=='/order':set_order(conn,value('platform'),value('post_id'),value('position'))
                         else:save_presentation(conn,value('accent'),value('font_size'),bool(value('show_origin')))
                 except ValueError as exc:return self.send(400,page('Invalid change',esc(exc)))
-                return self.redirect('/admin?view=settings' if route=='/presentation' else '/admin?view=pending')
+                destination=value('return_view') or 'pending'
+                if destination not in ('approved','pending','rejected'):destination='pending'
+                return self.redirect('/admin?view=settings' if route=='/presentation' else '/admin?view='+destination)
             if route=='/announcement':
                 try:
                     with closing(self.db_connection()) as conn:create_announcement(conn,value('text'),actor=self.actor())
@@ -349,7 +352,7 @@ def make_handler(db,password,host='127.0.0.1',port=5000,runtime=None,dev_enabled
             try:
                 with closing(self.db_connection()) as conn:decide(conn,value('platform'),value('post_id'),value('action'),actor=self.actor())
             except ValueError as exc:return self.send(400,page('Action unavailable',esc(exc)))
-            destination=value('return_view') if value('action') in ('pin','unpin') else 'pending'
+            destination=value('return_view') or 'pending'
             if destination not in ('approved','pending','rejected'):destination='approved'
             self.redirect('/admin?view='+destination)
     Handler.db=Path(db)
