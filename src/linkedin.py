@@ -162,18 +162,19 @@ class OAuth:
         self.pending = {}
         self.lock = threading.RLock()
 
-    def begin(self, session):
+    def begin(self, session, publish=False):
         config = self.config_getter()
         validate_settings(config)
+        requested_scopes=SCOPES | ({'w_organization_social'} if publish else set())
         state, nonce = secrets.token_urlsafe(32), secrets.token_urlsafe(32)
         with self.lock:
             self.pending = {k: v for k, v in self.pending.items() if v['expires'] > self.clock()}
             if len(self.pending) >= 100:
                 raise ValueError('Too many pending LinkedIn connections; try later')
-            self.pending[state] = dict(nonce=nonce, session=session, expires=self.clock()+600, config=config)
+            self.pending[state] = dict(nonce=nonce, session=session, expires=self.clock()+600, config=config, requested_scopes=requested_scopes)
         url = 'https://www.linkedin.com/oauth/v2/authorization?' + urlencode({
             'response_type': 'code', 'client_id': config['client_id'], 'redirect_uri': config['redirect_uri'],
-            'scope': ' '.join(sorted(SCOPES)), 'state': state})
+            'scope': ' '.join(sorted(requested_scopes)), 'state': state})
         return url, nonce
 
     def finish(self, state, nonce, code, denied=False):
@@ -190,6 +191,8 @@ class OAuth:
         config = pending['config']
         payload = self.request('https://www.linkedin.com/oauth/v2/accessToken', data={
             'grant_type': 'authorization_code', 'code': code, **config})
+        if not pending['requested_scopes'].issubset(set(re.split(r'[ ,]+',payload.get('scope','')))):
+            raise ValueError('LinkedIn did not grant the requested permissions')
         connection = self.credentials.save_grant(payload)
         session['linkedin_choice'] = dict(connection=connection, pages={}, start=0, more=True,
                                           expires=self.clock()+600)

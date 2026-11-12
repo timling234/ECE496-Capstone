@@ -55,6 +55,26 @@ class LinkedInTests(unittest.TestCase):
     def grant(self):
         return self.credentials.save_grant(self.request('https://www.linkedin.com/oauth/v2/accessToken'))
 
+    def test_posting_scope_is_explicit_and_must_be_granted(self):
+        from urllib.parse import urlparse,parse_qs
+        session=self.session()
+        url,nonce=self.oauth.begin(session)
+        self.assertNotIn('w_organization_social',parse_qs(urlparse(url).query)['scope'][0])
+        url,nonce=self.oauth.begin(session,publish=True)
+        query=parse_qs(urlparse(url).query)
+        self.assertIn('w_organization_social',query['scope'][0])
+        with self.assertRaises(ValueError):self.oauth.finish(query['state'][0],nonce,'fixture-code')
+        self.assertFalse(list(self.credentials.directory.glob('*.json')))
+        original=self.oauth.request
+        def grant_write(*args,**kwargs):
+            result=original(*args,**kwargs)
+            result['scope']+=',w_organization_social'
+            return result
+        self.oauth.request=grant_write
+        url,nonce=self.oauth.begin(session,publish=True)
+        self.oauth.finish(parse_qs(urlparse(url).query)['state'][0],nonce,'new-code')
+        self.assertIn('w_organization_social',self.credentials.read(session['linkedin_choice']['connection'])['scope'])
+
     def test_oauth_binds_browser_state_session_and_consumes_code_once(self):
         session=self.session();url,nonce=self.oauth.begin(session);state=parse_qs(urlparse(url).query)['state'][0]
         self.assertNotIn('PRIVATE-CLIENT-SECRET',url)

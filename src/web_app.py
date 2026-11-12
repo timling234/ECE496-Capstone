@@ -215,7 +215,7 @@ def make_handler(db,password,host='127.0.0.1',port=5000,runtime=None,dev_enabled
             if not session['authenticated']:return self.send(403,page('Sign in required',''))
             if route=='/linkedin/connect':
                 if not self.runtime:return self.send(400,page('LinkedIn unavailable','The source runtime is required.'))
-                try:url,nonce=self.linkedin_oauth.begin(session)
+                try:url,nonce=self.linkedin_oauth.begin(session,publish=True) if value('publish_mock')=='1' else self.linkedin_oauth.begin(session)
                 except ValueError as error:return self.send(400,page('LinkedIn setup required',esc(error)))
                 return self.redirect(url,oauth_cookie+'='+nonce+'; HttpOnly; SameSite=Lax; Path=/linkedin/callback; Max-Age=600'+cookie_secure)
             if route=='/linkedin/pages':
