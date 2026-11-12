@@ -55,6 +55,19 @@ class LinkedInTests(unittest.TestCase):
     def grant(self):
         return self.credentials.save_grant(self.request('https://www.linkedin.com/oauth/v2/accessToken'))
 
+    def test_image_posts_resolve_in_one_batch(self):
+        connection=self.grant();calls=[]
+        post=dict(POST,content={'multiImage':{'images':[{'id':'urn:li:image:fixture1','altText':'Test poster'},{'id':'urn:li:image:fixture2'}]}})
+        def request(url,**kwargs):
+            calls.append(url)
+            if '/posts?' in url:return {'elements':[post]}
+            return {'results':{'urn:li:image:fixture1':{'downloadUrl':'https://example.com/test1.png'},'urn:li:image:fixture2':{'downloadUrl':'https://example.com/test2.png'}}}
+        provider=LinkedInProvider('143906318',connection,self.credentials,request=request)
+        batch=provider.fetch(None)
+        self.assertEqual(len(calls),2)
+        self.assertEqual(len(batch.posts[0]['media']),2)
+        self.assertEqual(batch.posts[0]['media'][0]['alt'],'Test poster')
+
     def test_posting_scope_is_explicit_and_must_be_granted(self):
         from urllib.parse import urlparse,parse_qs
         session=self.session()

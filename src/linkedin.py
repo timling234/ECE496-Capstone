@@ -227,7 +227,7 @@ class OAuth:
         return choice
 
 
-def normalize(post, account, label=None):
+def normalize(post, account, label=None, image_assets=None):
     identity = post['id']
     if not re.fullmatch(r'urn:li:(?:share|ugcPost):\d+', identity):
         raise ValueError('Invalid LinkedIn post identifier')
@@ -239,10 +239,17 @@ def normalize(post, account, label=None):
     article = content.get('article') or {}
     link = article.get('source')
     links = [link] if isinstance(link, str) and urlparse(link).scheme in ('https', 'http') else []
+    media=[]
+    image_items=(content.get('multiImage') or {}).get('images',[]) or ([content['media']] if content.get('media') else [])
+    for item in image_items:
+        asset=(image_assets or {}).get(item.get('id'),{})
+        url=asset.get('downloadUrl','')
+        if isinstance(url,str) and urlparse(url).scheme=='https':
+            media.append(dict(url=url,alt=item.get('altText') or 'LinkedIn post image',asset_id=item['id']))
     return dict(platform='linkedin', account_id=account, post_id=identity,
                 created_at=created, text=post.get('commentary', ''),
                 post_url='https://www.linkedin.com/feed/update/' + quote(identity, safe=':' ) + '/',
-                links=links, media=[], metadata={'content': content, 'lastModifiedAt': post.get('lastModifiedAt'), 'source_label': label or 'LinkedIn Page '+account}, raw=post)
+                links=links, media=media, metadata={'content': content, 'lastModifiedAt': post.get('lastModifiedAt'), 'source_label': label or 'LinkedIn Page '+account}, raw=post)
 
 
 class LinkedInProvider:
@@ -274,12 +281,30 @@ class LinkedInProvider:
             raise
         if not isinstance(data.get('elements'), list):
             raise ValueError('LinkedIn returned an invalid post list')
+        # Resolve all referenced images in one bounded batch, never one call per photo.
+        image_ids=set()
+        for item in data['elements']:
+            if item.get('author') != 'urn:li:organization:' + self.account:
+                raise ValueError('LinkedIn returned a different organization')
+            if item.get('lifecycleState')!='PUBLISHED':continue
+            content=item.get('content') or {}
+            media=(content.get('multiImage') or {}).get('images',[]) or ([content['media']] if content.get('media') else [])
+            for image in media:
+                urn=image.get('id','')
+                if isinstance(urn,str) and re.fullmatch(r'urn:li:image:[A-Za-z0-9_-]+',urn):image_ids.add(urn)
+        assets={}
+        if image_ids and len(image_ids)<=100:
+            ids='List('+','.join(quote(urn,safe='') for urn in sorted(image_ids))+')'
+            try:assets=self.request('https://api.linkedin.com/rest/images?ids='+ids,token=token).get('results',{})
+            except HTTPError as error:
+                # Some read-only grants cannot resolve image resources; retain post text.
+                if error.code not in (403,404):raise
         posts = []
         for item in data['elements']:
             if item.get('author') != 'urn:li:organization:' + self.account:
                 raise ValueError('LinkedIn returned a different organization')
             if item.get('lifecycleState') == 'PUBLISHED':
-                posts.append(normalize(item, self.account, self.label))
-        # One recent window per pull. No implicit pagination, media calls or retries.
+                posts.append(normalize(item, self.account, self.label, assets))
+        # One recent window and at most one media batch. No pagination or retries.
         newest = max((p['raw'].get('lastModifiedAt', 0) for p in posts), default=0)
         return FetchBatch(posts, str(newest) if newest else checkpoint)

@@ -129,3 +129,10 @@ Use a localhost certificate trusted by your browser. Certificate trust installat
 is a separate explicit user action. Never commit certificates' private keys or
 disable TLS verification. Register the HTTPS callback and configure the same URI
 in the private LinkedIn server settings.
+
+## Image ingestion update — 2026-11-12
+
+Published single-image and multi-image posts now resolve their image URNs using
+one bounded Images API batch per pull, rather than a request per picture.
+Read-only grants that receive 403/404 from image resolution retain the post text.
+Post eligibility and manual editorial decisions remain unchanged.
