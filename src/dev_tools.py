@@ -137,6 +137,8 @@ class DevTools:
                 # No shell or browser-supplied command/path; credentials removed from child env.
                 env={k:v for k,v in os.environ.items() if not any(t in k.upper() for t in ('PASSWORD','TOKEN','SECRET'))}
                 env['ASAP_DEV_TOOLS']='0';env['PYTHONIOENCODING']='utf-8'
+                # Fixture HTTP servers cannot receive production Secure cookies.
+                env['ASAP_COOKIE_SECURE']='0'
                 result=subprocess.run(command,cwd=ROOT,env=env,shell=False,capture_output=True,text=True,encoding='utf-8',errors='replace',timeout=self.timeout)
                 output=result.stdout+result.stderr
                 if result.returncode:status='FAIL'

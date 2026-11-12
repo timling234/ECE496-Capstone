@@ -86,10 +86,12 @@ class OperationsTests(unittest.TestCase):
         tools.active=True
         with self.assertRaises(ValueError):tools.submit('all')
         tools.active=False
-        with patch.dict(os.environ,{'ASAP_ADMIN_PASSWORD':'SYNTHETIC_PRIVATE_VALUE'}),patch('src.dev_tools.subprocess.run',side_effect=subprocess.TimeoutExpired('allowlisted',1,output=b'SYNTHETIC_PRIVATE_VALUE')):
+        with patch.dict(os.environ,{'ASAP_ADMIN_PASSWORD':'SYNTHETIC_PRIVATE_VALUE','ASAP_COOKIE_SECURE':'1'}),patch('src.dev_tools.subprocess.run',side_effect=subprocess.TimeoutExpired('allowlisted',1,output=b'SYNTHETIC_PRIVATE_VALUE')) as child:
             tools.submit('all');tools.thread.join(5)
             row=tools.history()[0]
             self.assertEqual(row['status'],'TIMEOUT');self.assertNotIn('SYNTHETIC_PRIVATE_VALUE',row['output'])
+            self.assertEqual(child.call_args.kwargs['env']['ASAP_COOKIE_SECURE'],'0')
+            self.assertEqual(os.environ['ASAP_COOKIE_SECURE'],'1')
 
     def test_explicit_test_account_is_required_and_identity_checked(self):
         """Verifies FR-10: publisher never derives target from retrieval account."""
