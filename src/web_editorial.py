@@ -36,6 +36,8 @@ def fingerprint(post):
 
 def items(conn):
     posts=load_posts(conn)
+    from .embed_review import attach
+    attach(conn,posts)
     unavailable={(a,b) for a,b in conn.execute('SELECT c.platform,c.post_id FROM source_post_checks c WHERE c.unavailable=1 AND c.checked_at=(SELECT MAX(n.checked_at) FROM source_post_checks n WHERE n.platform=c.platform AND n.post_id=c.post_id)')} if table_exists(conn,'source_post_checks') else set()
     relevance={(a,b):s for a,b,s in conn.execute('SELECT * FROM relevance')}
     groups={(a,b):g for a,b,g in conn.execute('SELECT * FROM duplicate_candidates')}

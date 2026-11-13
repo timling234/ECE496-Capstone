@@ -60,3 +60,36 @@ class ReshareTests(unittest.TestCase):
         html=feed_body(publishable(conn),{'show_origin':1},esc,safe_url)
         self.assertIn(embed_url(post),html)
         self.assertNotIn('Research Author',html)
+
+    def test_public_embed_text_cache_and_model_input_preserve_editorial_state(self):
+        import tempfile,json
+        from pathlib import Path
+        from src.embed_review import prepare,RepostText,review_text
+        from src.review_ai import LocalModel
+        from src.publishing_policy import recommendation
+        html='<article data-test-id="feed-reshare-content" data-attributed-urn="'+ROOT+'"><p data-test-id="feed-reshare-content__commentary">A polished research update.<br>Seminar on Friday.</p></article>'
+        post=hydrate(self.provider(False),[copy.deepcopy(RESHARE)],'token')[0]
+        with tempfile.TemporaryDirectory() as directory:
+            db=Path(directory)/'test.sqlite3'
+            with sqlite3.connect(db) as conn:
+                store(conn,[post]);process_stored(conn);conn.commit();initialize(conn);conn.commit()
+                decide(conn,'linkedin',post['post_id'],'approve',actor='human')
+            reader=Mock(return_value=html)
+            prepare(db,[post],reader=reader)
+            with sqlite3.connect(db) as conn:
+                current=items(conn)[0]
+                self.assertEqual(current['editorial_status'],'approved')
+                self.assertEqual(current['text'],'')  # API provenance stays untouched.
+                self.assertIn('Seminar on Friday.',review_text(current))
+                self.assertIsNone(recommendation(current))
+            prepare(db,[current],reader=reader);reader.assert_called_once()
+            model=LocalModel('http://localhost:11434','fixture')
+            model.generate=Mock(return_value=dict(recommendation='approve',reason='Substantive repost.'))
+            self.assertEqual(model.review(current)['recommendation'],'approve')
+            payload=json.loads(model.generate.call_args.args[1])
+            self.assertIn('Seminar on Friday.',payload['text']);self.assertFalse(payload['media_reviewed'])
+            current['metadata']['embed_review']['text']='Another test from bluesky'
+            self.assertEqual(recommendation(current)['recommendation'],'reject')
+            for invalid in (html.replace(ROOT,'urn:li:ugcPost:999'),html.split('</p>')[0]):
+                parser=RepostText({ROOT});parser.feed(invalid);parser.close()
+                with self.assertRaises(ValueError):parser.text()

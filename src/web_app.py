@@ -50,7 +50,7 @@ def card(p,csrf=None,show_origin=True,return_view="pending"):
     if frame:
         body+=frame
         if p['metadata'].get('original_resolution')!='available':
-            body+='<p><small>Review the LinkedIn preview before approving. AI cannot inspect the original content returned only inside this embed.</small></p>'
+            body+='<p><small>'+('AI can review the extracted original text. Images and videos are not analyzed.' if p['metadata'].get('embed_review',{}).get('status')=='complete' else 'AI review will attempt to read the public original text. If unavailable, review the preview manually.')+'</small></p>'
     body+='<p class="content">'+esc(p['text'])+'</p>'
     url=safe_url(p['post_url'])
     if url: body+='<a target="_blank" rel="noopener noreferrer" href="'+esc(url)+'">Original post</a>'
