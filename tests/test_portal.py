@@ -252,6 +252,9 @@ class PortalTests(unittest.TestCase):
         self.google.exchange.assert_called_once()
         uid = self.accounts.session(self.a.get_cookie(COOKIE).value)['user_id']
         self.assertEqual(self.accounts.user(uid)['google_sub'], 'google-sub-1')
+        # An explicit Google sign-in click must still reach the chooser if ASAP is signed in.
+        response=self.a.get('/auth/google')
+        self.assertTrue(response.headers['Location'].startswith('https://accounts.google.com/'))
 
     def test_google_never_auto_links_local_email_and_explicit_link_is_csrf_protected(self):
         alice = self.register(self.a, 'alice@example.com')
@@ -286,6 +289,8 @@ class PortalTests(unittest.TestCase):
         google = GoogleLogin('id','secret','https://asap.surf/auth/google/callback')
         values = parse_qs(urlparse(google.authorize('state','nonce','verifier')).query)
         self.assertEqual(values['scope'],['openid email profile'])
+        self.assertEqual(values['prompt'],['select_account'])
+        self.assertNotIn('login_hint',values)
         self.assertEqual(values['code_challenge_method'],['S256'])
         self.assertNotIn('secret', google.authorize('state','nonce','verifier'))
         self.assertEqual(values['nonce'],['nonce'])

@@ -19,7 +19,7 @@ class GoogleLogin:
         challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b'=').decode()
         return 'https://accounts.google.com/o/oauth2/v2/auth?' + urlencode(dict(
             client_id=self.client_id, redirect_uri=self.redirect_uri, response_type='code',
-            scope='openid email profile', state=state, nonce=nonce,
+            scope='openid email profile', state=state, nonce=nonce, prompt='select_account',
             code_challenge=challenge, code_challenge_method='S256'))
 
     def exchange(self, code, verifier, nonce):

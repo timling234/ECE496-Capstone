@@ -193,8 +193,6 @@ def create_app(db, password, runtime=None, *, start_workers=False, google=None, 
             if not g.user:
                 abort(403)
             check_csrf(); link_user = g.user['id']
-        elif g.user:
-            return redirect('/admin', 303)
         throttle('google-start')
         anonymous()
         state, nonce, verifier = accounts.start_oauth(g.token, link_user)
