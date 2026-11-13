@@ -109,3 +109,31 @@ for change detection so expiring image URLs alone do not revoke an approval.
 References: https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/posts-api
 https://docs.x.com/x-api/posts/lookup/introduction
 https://github.com/bluesky-social/atproto/blob/main/lexicons/app/bsky/feed/getPosts.json
+
+Publication guard: an explicit MOCK POST / FOR TEST PURPOSE ONLY heading is
+rejected by a separate deterministic rule, even if model advice says approve.
+The UI labels rule decisions as such. Manual/bulk publication is blocked and old
+approvals cannot expose these artifacts in the real public feed. Normal research
+about testing is not blocked. The benchmark includes the full long mock caption
+that exposed the earlier false approval, with rule/model attribution in results.
+No fine-tuning or model weight changes were performed.
+
+News presentation: desktop four-card pagination with dots and boundary arrows;
+tablet two cards, phone one card. Read more expands only its own card, retaining
+full text and preserving other cards. Original-author attribution is explicitly
+kept separate from the publishing account; unknown identities use a placeholder,
+not an invented profile. Heart/comment links open the real platform; Share copies
+or invokes the browser's share UI. Mock sample mode now contains authorized MSRG
+reference snapshots and fictional second-page samples, explicitly marked testing.
+The same-origin Mock frame can grow on expansion. No tracking widget is embedded.
+LinkedIn commentary is decoded from little text, preventing raw hashtag templates
+and backslash escapes from leaking into UI. Posting tools must encode reserved
+characters; text and media have distinct semantics and image counts are verified.
+
+Email categories, in action-priority order: AI needs human review, re-authentication,
+possible duplicates, new posts. Each is independently selectable. Existing new-post
+behavior is preserved; the three added categories start off until selected. Events
+are recorded once per post/content/policy, source connection, or duplicate group.
+Disabled categories consume events without retroactive mail. A renewed source
+connection can notify again if a new authentication problem occurs. SMTP tests use
+mocks; no real notification was sent to validate this update.

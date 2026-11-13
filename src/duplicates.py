@@ -40,4 +40,6 @@ def mark_duplicate_candidates(conn, candidates, strategy=exact_text_groups):
     conn.executemany("INSERT INTO duplicate_candidates VALUES (?, ?, ?)",
                      [(platform, post_id, group_id) for group_id, members in groups.items()
                       for platform, post_id in members])
+    from .notifications import queue_event
+    for group in groups:queue_event(conn,'duplicates',group,platform='duplicates',post_id=group)
     return groups

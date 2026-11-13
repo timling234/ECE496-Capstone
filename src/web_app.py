@@ -44,6 +44,7 @@ def card(p,csrf=None,show_origin=True,return_view="pending"):
     if csrf:
         body+='<label class="post-select" hidden><input type="checkbox" name="post" form="post-bulk" value="'+esc(json.dumps([p['platform'],p['post_id']],separators=(',',':')))+'" aria-label="Select post"></label>'
         body+='<form class="post-delete" method="post" action="/posts-action"><input type="hidden" name="csrf" value="'+esc(csrf)+'"><input type="hidden" name="return_view" value="'+esc(return_view)+'"><input type="hidden" name="post" value="'+esc(json.dumps([p['platform'],p['post_id']],separators=(',',':')))+'"><input type="hidden" name="action" value="delete"><button title="Delete post" aria-label="Delete post">&#10006;</button></form>'
+    if p.get('publication_blocked'):body+='<p class="bad">Explicit test-purpose-only content is excluded from the public feed.</p>'
     if p.get('source_unavailable'):body+='<p class="bad">Original post is deleted or unavailable. Hidden from the public feed.</p>'
     body+='<p class="content">'+esc(p['text'])+'</p>'
     url=safe_url(p['post_url'])
@@ -63,8 +64,9 @@ def card(p,csrf=None,show_origin=True,return_view="pending"):
             if review['stale'] or review['status']=='stale':
                 body+='<p><small>AI suggestion is outdated. Request a new review.</small></p>'
             elif review['status']=='complete':
+                policy_rule=review['reason'].startswith('Publishing rule:')
                 label={'approve':'Approve','reject':'Reject','needs_review':'Needs review'}.get(review['recommendation'],'Needs review')
-                body+='<section class="ai-suggestion"><b>AI suggestion: '+esc(label)+'</b><p>'+esc(review['reason'])+'</p><small>AI analysis · '+esc(review['model'])+'</small></section>'
+                body+='<section class="ai-suggestion"><b>'+('Publishing rule: ' if policy_rule else 'AI suggestion: ')+esc(label)+'</b><p>'+esc(review['reason'])+'</p><small>'+('Deterministic policy check' if policy_rule else 'AI analysis · '+esc(review['model']))+'</small></section>'
                 if review.get('execution'):body+='<p><small>'+esc(review['execution'])+'</small></p>'
             elif review['status']=='error':body+='<p><small>'+esc(review['error'])+'</small></p>'
             else:body+='<p><small>AI review in progress…</small></p>'
@@ -72,7 +74,7 @@ def card(p,csrf=None,show_origin=True,return_view="pending"):
             running=review and review['status']=='running'
             body+='<form method="post" action="/llm/suggest"><input type="hidden" name="csrf" value="'+csrf+'"><input type="hidden" name="return_view" value="'+esc(return_view)+'"><input type="hidden" name="platform" value="'+esc(p['platform'])+'"><input type="hidden" name="post_id" value="'+esc(p['post_id'])+'"><button '+('disabled' if running else '')+'>AI review suggestion</button></form>'
         actions=['reject']
-        if p['candidate_status']=='candidate': actions.insert(0,'approve')
+        if p['candidate_status']=='candidate' and not p.get('publication_blocked'): actions.insert(0,'approve')
         if p['editorial_status']=='approved': actions=['withdraw','reject','unpin' if p['pinned'] else 'pin']
         for action in actions:
             label='Select & approve' if action=='approve' and p['group'] else action.capitalize()
@@ -336,7 +338,7 @@ def make_handler(db,password,host='127.0.0.1',port=5000,runtime=None,dev_enabled
             if route=='/notifications':
                 try:
                     with closing(self.db_connection()) as conn:
-                        notifications.save_settings(conn,bool(value('enabled')),value('channel'),value('recipient'))
+                        notifications.save_settings(conn,bool(value('enabled')),value('channel'),value('recipient'),{event:bool(value('notify_'+event)) for event in notifications.EVENTS})
                 except ValueError as exc:return self.send(400,page('Invalid notification settings',esc(exc)))
                 if self.runtime:self.runtime.wake.set()
                 return self.redirect('/admin?view=settings')

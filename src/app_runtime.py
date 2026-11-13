@@ -121,6 +121,12 @@ class AppRuntime:
                         with conn:conn.execute('UPDATE source_poll_state SET next_poll_at=? WHERE source_key=?',(due,key))
                     self.previous[key]=current
                 if len({source.provider.key for source in sources})!=len(sources):raise ValueError('Duplicate configured source')
+                from .notifications import queue_event
+                for configured in self.read_config()['sources']:
+                    signal=conn.execute('SELECT error_code,error_type,last_attempt_at FROM source_poll_state WHERE source_key=?',(identity(configured),)).fetchone()
+                    evidence=dict(configured,**dict(zip(('error_code','error_type','last_attempt_at'),signal or (None,None,None))))
+                    if configured.get('connection_id') and authentication(evidence,self.config_path.parent,now)=='Reconnect required':
+                        with conn:queue_event(conn,'reauth',identity(configured),configured['connection_id'],configured['platform'],identity(configured))
                 outcomes=[]
                 for source in sources:
                     self.active=source.provider.key if source.enabled else None

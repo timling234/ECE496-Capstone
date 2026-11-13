@@ -10,6 +10,7 @@ from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, urlparse, quote
 from urllib.request import Request, build_opener, HTTPRedirectHandler
+from .linkedin_text import decode as plain_text
 
 SCOPES = {'r_organization_social', 'rw_organization_admin'}
 LOCK = threading.RLock()
@@ -247,7 +248,7 @@ def normalize(post, account, label=None, image_assets=None):
         if isinstance(url,str) and urlparse(url).scheme=='https':
             media.append(dict(url=url,alt=item.get('altText') or 'LinkedIn post image',asset_id=item['id']))
     return dict(platform='linkedin', account_id=account, post_id=identity,
-                created_at=created, text=post.get('commentary', ''),
+                created_at=created, text=plain_text(post.get('commentary', '')),
                 post_url='https://www.linkedin.com/feed/update/' + quote(identity, safe=':' ) + '/',
                 links=links, media=media, metadata={'content': content, 'lastModifiedAt': post.get('lastModifiedAt'), 'source_label': label or 'LinkedIn Page '+account}, raw=post)
 

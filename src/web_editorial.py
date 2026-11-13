@@ -38,6 +38,8 @@ def items(conn):
     ordering={(a,b):(p,n) for a,b,p,n in conn.execute('SELECT * FROM feed_order')}
     reasons={(a,b):r for a,b,r in conn.execute('SELECT * FROM editorial_reasons')} if table_exists(conn,'editorial_reasons') else {}
     for p in posts:
+        from .publishing_policy import explicit_test_post
+        p['publication_blocked']=explicit_test_post(p)
         p['source_unavailable']=(p['platform'],p['post_id']) in unavailable
         p['pinned'],p['position']=ordering.get((p['platform'],p['post_id']),(0,0))
         key=(p['platform'],p['post_id']); d=decisions.get(key)
@@ -47,6 +49,7 @@ def items(conn):
         p['editorial_status']=d[2] if d else 'pending'
         if d and d[2]=='approved' and d[3] not in (fingerprint(p),hashlib.sha256(json.dumps({k:p[k] for k in ('text','created_at','post_url','links','media')},sort_keys=True).encode()).hexdigest()):
             p['editorial_status']='needs review'
+        if p['publication_blocked'] and p['editorial_status']=='approved':p['editorial_status']='needs review'
         # Earlier service approvals remain visible; provenance fields are not approval authority.
         if not d and table_exists(conn,'group_approvals') and p['group']:
             old=conn.execute('SELECT platform,post_id FROM group_approvals WHERE group_id=?',(p['group'],)).fetchone()
@@ -61,6 +64,7 @@ def decide(conn, platform, post_id, action, actor='admin', *, transaction=True):
     try:
         posts=items(conn); p=next((p for p in posts if (p['platform'],p['post_id'])==(platform,post_id)),None)
         if p is None: raise ValueError('Post not found')
+        if action=='approve' and p['publication_blocked']:raise ValueError('Explicit mock/test-purpose-only content cannot be published')
         if action=='approve' and p['candidate_status']!='candidate': raise ValueError('Only candidates can be approved')
         now=datetime.now(timezone.utc).isoformat()
         if action in ('pin','unpin'):
@@ -89,7 +93,7 @@ def publishable(conn):
     """FR-9: approved current candidates, at most one representative per group."""
     result=[]; seen=set()
     for p in sorted(items(conn),key=lambda p:(p['pinned'],p['created_at'] or '',p['platform'],p['post_id']),reverse=True):
-        if p['editorial_status']!='approved' or p['candidate_status']!='candidate': continue
+        if p['publication_blocked'] or p['editorial_status']!='approved' or p['candidate_status']!='candidate': continue
         if p['group'] and p['group'] in seen: continue
         if p['group']: seen.add(p['group'])
         result.append(p)
@@ -176,6 +180,7 @@ def bulk_action(conn, keys, action, actor='admin'):
                               'ai_suggestions','source_post_checks','notification_seen','notification_outbox','relevance','duplicate_candidates'):
                     if table_exists(conn,table):conn.execute('DELETE FROM '+table+' WHERE platform=? AND post_id=?',(platform,post_id))
                 if platform=='manual':conn.execute('DELETE FROM manual_versions WHERE post_id=?',(post_id,))
+                if table_exists(conn,'notification_events_seen'):conn.execute('DELETE FROM notification_events_seen WHERE subject=?',(platform+':'+post_id,))
                 conn.execute('DELETE FROM posts WHERE platform=? AND post_id=?',(platform,post_id))
                 # Bluesky may be configured by handle while records use DID. Reset
                 # that platform's boundaries, retaining cooldowns and polling switches.

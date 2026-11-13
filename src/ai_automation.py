@@ -33,6 +33,9 @@ def valid(result):
 
 
 def analyze(model,unit):
+    from .publishing_policy import recommendation
+    rules=[recommendation(p) for p in unit]
+    if all(rules):return rules
     if len(unit)==1 and not unit[0]['group']:
         return [valid(model.review(unit[0]))]
     if len(unit)>6 or sum(len(p['text']) for p in unit)>12000:
@@ -51,7 +54,7 @@ def analyze(model,unit):
     winners=[label for label in labels if records[label]['recommendation']=='approve']
     if len(winners)>1 or output['selected']!=(winners[0] if winners else None):raise ValueError('Conflicting group selection')
     if winners and any(records[label]['recommendation']!='reject' for label in labels if label not in winners):raise ValueError('Uncertain duplicate alternatives')
-    return [records[label] for label in labels]
+    return [rule or records[label] for rule,label in zip(rules,labels)]
 
 
 class AutomationReviewer(Reviewer):
@@ -168,6 +171,10 @@ class AutomationReviewer(Reviewer):
                 for index,(p,result) in enumerate(zip(unit,results)):
                     execution=why if not actions or index in executed else 'Preserved previous decision'
                     suggestion_ids.append(conn.execute('INSERT INTO ai_suggestions(platform,post_id,fingerprint,policy,model,status,recommendation,reason,actor,created_at,finished_at,batch_id,snapshot,execution) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)',(p['platform'],p['post_id'],fingerprint(p),cfg['policy'],cfg['model'],'complete' if fresh else 'stale',result['recommendation'],result['reason'],actor,time.time(),time.time(),batch,signature,execution)).lastrowid)
+                if fresh:
+                    from .notifications import queue_ai_review
+                    for p,result in zip(unit,results):
+                        if result['recommendation']=='needs_review':queue_ai_review(conn,p,cfg['model'],cfg['policy'])
                 for index,action in actions:
                     p=unit[index]
                     decide(conn,p['platform'],p['post_id'],action,actor='ai:'+actor,transaction=False)

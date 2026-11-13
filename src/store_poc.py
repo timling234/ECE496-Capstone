@@ -107,6 +107,11 @@ def store(conn, posts):
     )""")
     now = datetime.now(timezone.utc).isoformat()
     for post in posts:
+        metadata=dict(post['metadata'])
+        old=conn.execute('SELECT metadata_json FROM posts WHERE platform=? AND post_id=?',(post['platform'],post['post_id'])).fetchone()
+        if old and 'attribution' not in metadata:
+            attribution=json.loads(old[0]).get('attribution')
+            if attribution:metadata['attribution']=attribution
         conn.execute("""INSERT INTO posts
             (platform, post_id, account_id, created_at, text, post_url,
              links_json, media_json, metadata_json, raw_json, fetched_at)
@@ -120,7 +125,7 @@ def store(conn, posts):
                 post["platform"], post["post_id"], post["account_id"],
                 post["created_at"], post["text"], post["post_url"],
                 json.dumps(post["links"]), json.dumps(post["media"]),
-                json.dumps(post["metadata"]), json.dumps(post["raw"]), now,
+                json.dumps(metadata), json.dumps(post["raw"]), now,
             ))
 
 

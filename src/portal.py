@@ -280,7 +280,7 @@ def create_app(db, password, runtime=None, *, start_workers=False, google=None, 
         from .web_app import safe_url
         settings=dict(accent='#215e95',font_size=14,show_origin=1)
         settings.update(appearance_overrides({k:request.args.getlist(k) for k in request.args}))
-        body='<p class="demo-banner"><b>Mock website for testing purpose</b> · Fictional samples, not published posts.</p>'
+        body='<p class="demo-banner"><b>Mock website for testing purpose</b> · Authorized MSRG reference snapshots and fictional samples; not a live MSRG feed.</p>'
         body+=feed_body(sample_posts(request.host_url.rstrip('/')),settings,esc,safe_url)
         return Response(page('ASAP sample feed',body,settings),content_type='text/html; charset=utf-8')
 

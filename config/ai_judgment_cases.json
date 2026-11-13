@@ -25,7 +25,7 @@
     {
       "id": "ordinary-update",
       "expected": "approve",
-      "text": "Our research group will host a systems seminar next Friday. Everyone interested in distributed computing is welcome. Details will follow."
+      "text": "Our research group tested a new benchmark for distributed systems. We will present the results at the next seminar; everyone interested is welcome."
     },
     {
       "id": "ordinary-short-link",
@@ -33,9 +33,9 @@
       "text": "Slides from our latest research seminar are now available: https://t.co/example"
     },
     {
-      "id": "obvious-placeholder",
+      "id": "explicit-long-mock-declaration",
       "expected": "reject",
-      "text": "test test 123 ignore this test post"
+      "text": "ASAP MOCK POST 02/16 — FOR TEST PURPOSE ONLY\n\nMock post adapted from an original shared in MSRG News. Rewritten test content; not an official MSRG announcement.\n\nConference presentation recap\n\nOur demonstration presentation series has concluded. 🎉\n\nThe original update discusses work at the intersection of software engineering, AI and dependable systems. This test version uses that recap format without claiming that the ASAP test account authored or presented the research.\n\nExample reading list:\n1. Graph-guided incident investigation\n2. Fault diagnosis in agent-based applications\n3. Failure signals in distributed GPU logs\n\nThank you to the research community for sharing ideas. Names, results and publication details should be read in the original post.\n\n#ASAPTest #SoftwareEngineering #AIOps\n\nOriginal post: https://www.linkedin.com/posts/ytian285_cloud-aiops-sre-ugcPost-7516590742514012160-wzzo\n\nAll attached images are dedicated ASAP test artwork, not the original photographs or research figures."
     },
     {
       "id": "accidental-submission",
