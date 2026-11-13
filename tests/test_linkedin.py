@@ -201,7 +201,13 @@ class LinkedInTests(unittest.TestCase):
         self.assertIn('Authenticate',admin);self.assertNotIn('access pending',admin.lower())
         csrf=re.search('name="csrf" value="([^"]+)"',admin)[1]
         self.assertEqual(http('/linkedin/connect',{'csrf':'bad'})[0],403)
-        status,_,url=http('/linkedin/connect',{'csrf':csrf});self.assertEqual(status,303)
+        status,_,choice_url=http('/linkedin/connect',{'csrf':csrf});self.assertEqual(status,303)
+        self.assertIn('connect_provider=linkedin',choice_url)
+        _,account_choice,_=http(choice_url)
+        self.assertIn('Use a different LinkedIn account',account_choice)
+        self.assertIn('https://www.linkedin.com/uas/login',account_choice)
+        self.assertEqual(self.calls,[]) # No token exchange or provider call before account choice.
+        status,_,url=http('/linkedin/connect',{'csrf':csrf,'continue_auth':'1'});self.assertEqual(status,303)
         state=parse_qs(urlparse(url).query)['state'][0]
         status,_,location=http('/linkedin/callback?'+urlencode({'state':state,'code':'fixture-code'}),callback=True)
         self.assertEqual(status,303)

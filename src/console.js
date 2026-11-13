@@ -34,7 +34,7 @@
     if (!main()) return;
     const active = main().dataset.busy === 'true';
     const view = new URL(location.href).searchParams.get('view') || 'dashboard';
-    if (view === 'mock') return;
+    if (view === 'mock' || document.querySelector('[data-account-choice]')) return;
     if (active || ['dashboard', 'sources', 'pending', 'testing', 'approved', 'rejected'].includes(view))
       timer = setTimeout(refresh, active ? 3000 : 15000);
   }

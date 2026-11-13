@@ -230,6 +230,8 @@ def make_handler(db,password,host='127.0.0.1',port=5000,runtime=None,dev_enabled
                 if not self.runtime:return self.send(400,page('LinkedIn unavailable','The source runtime is required.'))
                 if value('publish_mock')=='1' and posting_connections(self.read_config(),self.linkedin_oauth.credentials):
                     return self.redirect('/admin?view=testing&notice=LinkedIn+is+already+authorized+for+Fetch+and+test+posting.')
+                if value('continue_auth')!='1':
+                    return self.redirect('/admin?view=sources&connect_provider=linkedin'+('&connect_publishing=1' if value('publish_mock')=='1' else ''))
                 try:url,nonce=self.linkedin_oauth.begin(session,publish=value('publish_mock')=='1')
                 except ValueError as error:return self.send(400,page('LinkedIn setup required',esc(error)))
                 return self.redirect(url,oauth_cookie+'='+nonce+'; HttpOnly; SameSite=Lax; Path=/linkedin/callback; Max-Age=600'+cookie_secure)
