@@ -26,6 +26,7 @@ class AppRuntime:
         self.thread=None
         self.error=None
         self.active=None
+        self.auto_reviewer=None
         self.previous={}
         self.pending=set()
         if not self.config_path.exists():
@@ -132,6 +133,7 @@ class AppRuntime:
                     self.active=source.provider.key if source.enabled else None
                     try:outcomes.extend(poll_due(conn,[source],now))
                     finally:self.active=None
+            if self.auto_reviewer:self.auto_reviewer.tick(self.db)
             self.error=None
             return outcomes
 

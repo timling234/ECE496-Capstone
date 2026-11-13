@@ -53,3 +53,5 @@ provider retrieval or model inference. Updates pause while editing a form.
 
 Settings no longer displays the automatic review history list. Audit records
 remain stored; per-post reasons and review batch progress remain available.
+
+Continuous queue review: the Review Queue switch is off by default and persists per workspace. When enabled, Server checks once per minute, reviews new/changed pending posts (including duplicate groups), and uses the existing automatic approve/reject permissions. With both permissions off, it creates suggestions only. Matching completed/error results are not repeatedly inferred; errors require a manual retry or a changed post/policy/model. Queue display filters and sorting do not limit this background worker. Narrow standalone placeholder messages (for example “Another test from bluesky”) are rejected by a labeled deterministic rule; substantive research about testing remains eligible.

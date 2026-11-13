@@ -58,6 +58,19 @@ def analyze(model,unit):
 
 
 class AutomationReviewer(Reviewer):
+    def tick(self,db):
+        # Once a minute per workspace; unchanged completed/error units are not retried.
+        now=time.monotonic()
+        if not hasattr(self,'next_queue_check'):self.next_queue_check={}
+        key=str(db)
+        if self.next_queue_check.get(key,0)>now or self.slot.locked():return
+        self.next_queue_check[key]=now+60
+        cfg=self.config(db)
+        if not cfg['always_review']:return
+        mode='automatic' if cfg['auto_approve'] or cfg['auto_reject'] else 'advice'
+        try:self.run_batch(db,'queue-worker:'+str(int(cfg['auto_approve']))+str(int(cfg['auto_reject'])),mode,fresh_only=True)
+        except ValueError:pass  # Empty queue, unconfigured model, or another active review.
+
     def config(self,db):
         with closing(sqlite3.connect(db,timeout=15)) as conn:
             result=settings(conn,self.model.model);conn.commit();return result
@@ -71,7 +84,7 @@ class AutomationReviewer(Reviewer):
     def submit(self,db,platform,post_id,actor):
         return self.run_batch(db,actor,'advice',target=(platform,post_id))
 
-    def run_batch(self,db,actor,mode,target=None):
+    def run_batch(self,db,actor,mode,target=None,fresh_only=False):
         if mode not in ('advice','automatic'):raise ValueError('Invalid review mode')
         cfg=self.config(db)
         if mode=='automatic' and not (cfg['auto_approve'] or cfg['auto_reject']):raise ValueError('Enable automatic approve or reject in Local AI settings first')
@@ -90,8 +103,10 @@ class AutomationReviewer(Reviewer):
                 seen.add(key)
                 unit=[p for p in posts if p['group']==seed['group']] if seed['group'] else [seed]
                 unit.sort(key=lambda p:(p['platform'],p['post_id']))
+                signature=snapshot(conn,unit)
+                if fresh_only and all(conn.execute("SELECT 1 FROM ai_suggestions WHERE platform=? AND post_id=? AND fingerprint=? AND model=? AND policy=? AND snapshot=? AND actor=? AND status IN ('complete','error') LIMIT 1",(p['platform'],p['post_id'],fingerprint(p),cfg['model'],cfg['policy'],signature,actor)).fetchone() for p in unit):continue
                 if count+len(unit)>cfg['batch_limit']:continue
-                units.append((unit,snapshot(conn,unit)));count+=len(unit)
+                units.append((unit,signature));count+=len(unit)
             if not units:raise ValueError('No posts within the batch limit; increase the limit or review a smaller selection')
             if not self.slot.acquire(blocking=False):raise ValueError('The local model is busy. Wait for the current review to finish.')
             try:

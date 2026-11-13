@@ -28,6 +28,7 @@ class Workspaces:
         self.start_workers = start_workers
         self.lock = threading.RLock()
         self.active = {}
+        self.auto_reviewer = None
 
     def get(self, uid):
         if not re.fullmatch('[0-9a-f]{32}', uid) or not self.accounts.user(uid):
@@ -53,6 +54,7 @@ class Workspaces:
                         raise ValueError('X requires a dedicated workspace token configured by the server administrator.')
                 return load_sources(path)
             runtime = AppRuntime(db, config, loader=loader)
+            runtime.auto_reviewer = self.auto_reviewer
             workspace = Workspace(db, runtime, OAuth(Credentials(directory / 'linkedin_credentials')))
             self.active[uid] = workspace
             if self.start_workers:

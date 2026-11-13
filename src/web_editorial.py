@@ -38,8 +38,8 @@ def items(conn):
     ordering={(a,b):(p,n) for a,b,p,n in conn.execute('SELECT * FROM feed_order')}
     reasons={(a,b):r for a,b,r in conn.execute('SELECT * FROM editorial_reasons')} if table_exists(conn,'editorial_reasons') else {}
     for p in posts:
-        from .publishing_policy import explicit_test_post
-        p['publication_blocked']=explicit_test_post(p)
+        from .publishing_policy import explicit_test_post,placeholder_test_post
+        p['publication_blocked']=explicit_test_post(p) or placeholder_test_post(p)
         p['source_unavailable']=(p['platform'],p['post_id']) in unavailable
         p['pinned'],p['position']=ordering.get((p['platform'],p['post_id']),(0,0))
         key=(p['platform'],p['post_id']); d=decisions.get(key)
@@ -64,7 +64,7 @@ def decide(conn, platform, post_id, action, actor='admin', *, transaction=True):
     try:
         posts=items(conn); p=next((p for p in posts if (p['platform'],p['post_id'])==(platform,post_id)),None)
         if p is None: raise ValueError('Post not found')
-        if action=='approve' and p['publication_blocked']:raise ValueError('Explicit mock/test-purpose-only content cannot be published')
+        if action=='approve' and p['publication_blocked']:raise ValueError('Placeholder or explicitly test-only content cannot be published')
         if action=='approve' and p['candidate_status']!='candidate': raise ValueError('Only candidates can be approved')
         now=datetime.now(timezone.utc).isoformat()
         if action in ('pin','unpin'):

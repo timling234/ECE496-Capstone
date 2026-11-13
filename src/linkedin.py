@@ -242,6 +242,7 @@ def normalize(post, account, label=None, image_assets=None):
     links = [link] if isinstance(link, str) and urlparse(link).scheme in ('https', 'http') else []
     media=[]
     image_items=(content.get('multiImage') or {}).get('images',[]) or ([content['media']] if content.get('media') else [])
+    if article.get('thumbnail'):image_items=image_items+[{'id':article['thumbnail'],'altText':article.get('title') or 'Article thumbnail'}]
     for item in image_items:
         asset=(image_assets or {}).get(item.get('id'),{})
         url=asset.get('downloadUrl','')
@@ -291,6 +292,8 @@ class LinkedInProvider:
             if item.get('lifecycleState')!='PUBLISHED':continue
             content=item.get('content') or {}
             media=(content.get('multiImage') or {}).get('images',[]) or ([content['media']] if content.get('media') else [])
+            article=content.get('article') or {}
+            if article.get('thumbnail'):media=media+[{'id':article['thumbnail']}]
             for image in media:
                 urn=image.get('id','')
                 if isinstance(urn,str) and re.fullmatch(r'urn:li:image:[A-Za-z0-9_-]+',urn):image_ids.add(urn)

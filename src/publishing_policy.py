@@ -8,7 +8,15 @@ def explicit_test_post(post):
     return bool(re.search(r'^(?:ASAP\s+)?MOCK\s+POST\b.*\bFOR\s+TEST(?:ING)?\s+PURPOSES?\s+ONLY\b',heading,re.I) or re.fullmatch(r'(?:THIS (?:POST|MESSAGE) IS )?FOR TEST(?:ING)? PURPOSES? ONLY[.!]?',heading,re.I))
 
 
+def placeholder_test_post(post):
+    # Match whole, content-free messages; never a keyword ban on testing research.
+    text=post['text'].strip()
+    return bool(re.fullmatch(r'(?:another\s+)?(?:this\s+is\s+(?:a\s+)?)?test(?:ing)?(?:\s*\d+)?(?:\s+(?:post|message))?(?:\s+from\s+(?:bluesky|x|twitter|linkedin))?[.!]?',text,re.I))
+
+
 def recommendation(post):
     if explicit_test_post(post):
         return dict(recommendation='reject',reason='Publishing rule: this post explicitly declares itself mock/test-purpose-only content. It must not enter the public news feed. This is a deterministic policy check, not model inference.')
+    if placeholder_test_post(post):
+        return dict(recommendation='reject',reason='Publishing rule: this is a standalone placeholder/connectivity test message, not a news update. This is a deterministic policy check, not model inference.')
     return None

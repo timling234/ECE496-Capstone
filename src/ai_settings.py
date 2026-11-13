@@ -5,13 +5,14 @@ import sqlite3
 import threading
 import time
 import requests
-from .review_ai import POLICY,LEGACY_POLICY,PREVIOUS_POLICY,LocalModel
+from .review_ai import POLICY,LEGACY_POLICY,PREVIOUS_POLICY,TEST_DECLARATION_POLICY,LocalModel
 
 CATALOG={'gemma4:e2b-it-qat':'Gemma 4 E2B · lightweight', 'qwen3:4b':'Qwen 3 4B · compact','qwen3:8b':'Qwen 3 8B · balanced'}
 
 
 def initialize(conn):
     conn.execute('CREATE TABLE IF NOT EXISTS ai_settings (id INTEGER PRIMARY KEY CHECK(id=1), model TEXT NOT NULL,policy TEXT NOT NULL,auto_approve INTEGER NOT NULL,auto_reject INTEGER NOT NULL,batch_limit INTEGER NOT NULL)')
+    conn.execute('CREATE TABLE IF NOT EXISTS ai_queue_preferences (id INTEGER PRIMARY KEY CHECK(id=1), enabled INTEGER NOT NULL DEFAULT 0)')
     conn.execute('CREATE TABLE IF NOT EXISTS ai_model_downloads (id INTEGER PRIMARY KEY,model TEXT NOT NULL,status TEXT NOT NULL,progress INTEGER NOT NULL DEFAULT 0,error TEXT,created_at REAL NOT NULL)')
 
 
@@ -19,7 +20,9 @@ def settings(conn,default_model=''):
     initialize(conn)
     row=conn.execute('SELECT model,policy,auto_approve,auto_reject,batch_limit FROM ai_settings WHERE id=1').fetchone()
     result=dict(zip(('model','policy','auto_approve','auto_reject','batch_limit'),row or (default_model,POLICY,1,1,20)))
-    if result['policy'] in (LEGACY_POLICY,PREVIOUS_POLICY):result['policy']=POLICY
+    if result['policy'] in (LEGACY_POLICY,PREVIOUS_POLICY,TEST_DECLARATION_POLICY):result['policy']=POLICY
+    row=conn.execute('SELECT enabled FROM ai_queue_preferences WHERE id=1').fetchone()
+    result['always_review']=bool(row and row[0])
     return result
 
 

@@ -55,6 +55,9 @@ def create_app(db, password, runtime=None, *, start_workers=False, google=None, 
     for workspace in [default]+[workspaces.get(uid) for uid in accounts.ids()]:
         reviewer.recover(workspace.db)
         models.recover(workspace.db)
+    workspaces.auto_reviewer=reviewer
+    for workspace in [default]+list(workspaces.active.values()):
+        if workspace.runtime:workspace.runtime.auto_reviewer=reviewer
 
     def document(title, body, status=200):
         nav = '<nav><a href="/">ASAP</a>'
@@ -305,6 +308,7 @@ def create_app(db, password, runtime=None, *, start_workers=False, google=None, 
         except ValueError as exc:
             return document('AI review unavailable','<p>'+esc(exc)+'</p><a href="/admin?view=pending">Back to review queue</a>',400)
 
+    @app.post('/llm/queue')
     @app.post('/llm/settings')
     @app.post('/llm/download')
     @app.post('/llm/batch')
@@ -316,6 +320,12 @@ def create_app(db, password, runtime=None, *, start_workers=False, google=None, 
         if not secrets.compare_digest(request.form.get('csrf',''),session['csrf']):abort(403)
         throttle('ai-controls:'+str(g.user['id'] if g.user else 'admin'),6,60)
         try:
+            if request.path=='/llm/queue':
+                with closing(sqlite3.connect(workspace.db,timeout=15)) as conn:
+                    initialize_ai(conn)
+                    conn.execute('INSERT OR REPLACE INTO ai_queue_preferences VALUES (1,?)',(int(request.form.get('enabled')=='on'),));conn.commit()
+                if workspace.runtime:workspace.runtime.wake.set()
+                return redirect('/admin?view=pending&notice=Automatic+queue+review+setting+saved.',303)
             if request.path=='/llm/settings':
                 installed=models.installed(force=True)
                 with closing(sqlite3.connect(workspace.db,timeout=15)) as conn:save_ai_settings(conn,request.form,installed)

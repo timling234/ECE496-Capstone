@@ -102,6 +102,9 @@
   });
   document.addEventListener('input', e => { if (e.target.closest('main form')) dirty = true; });
   document.addEventListener('change', e => { if (e.target.closest('main form')) dirty = true; });
+  document.addEventListener('change', event => {
+    if (event.target.matches('[data-auto-submit]')) event.target.form.requestSubmit();
+  });
   document.addEventListener('submit', async event => {
     const form = event.target;
     if (form.method.toLowerCase() !== 'post') return;
