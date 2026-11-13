@@ -23,3 +23,11 @@ Nine actual LinkedIn HTTP calls: organization name (1), pre-reshare original bat
 Public Feed and Mock Website use the same renderer. Mock defaults to the workspace's published posts; reference snapshots remain an explicitly labeled sample mode and are never evidence of API access.
 
 References: [Posts API](https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/posts-api?view=li-lms-2026-09), [Post schema](https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/post-api-schema?view=li-lms-2026-08).
+
+## Native embed verification (same day)
+
+All four existing A reshares above rendered through LinkedIn's public `/embed/feed/update/{urn}` endpoint in fresh anonymous Chrome profiles. Each displayed ASAP Test Lab as the outer account and the expected inner original author (Yifang Tian, Tianyin Xu, Shivesh Prakash, Guoli Li), with original text. No B account authenticated.
+
+An actual iframe on a temporary local HTTP page was also visually verified for the Guoli Li reshare: outer A, inner B, avatar, original relative date, full text and five-photo mosaic loaded successfully. An initial file-URL frame failed; HTTP framing worked. The first HTTP screenshot preceded image loading; a real-time delayed capture confirmed all photos. Evidence remains in ignored `.tmp/native-embed-check/`. Temporary browser/server processes were closed.
+
+This verifies presentation of A wrapping B despite the REST original-content 403 results. It does not grant server-side AI access to B's content, prove every repost type embeds, or establish production integration. Current production CSP allows only self-hosted frames; integrating official LinkedIn frames still needs a narrow frame allowlist and a feed rendering decision. No additional LinkedIn REST API calls, posts or deletions were made during this check; only public embed pages and their assets were loaded.
