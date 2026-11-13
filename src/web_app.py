@@ -44,7 +44,6 @@ def card(p,csrf=None,show_origin=True,return_view="pending"):
     if csrf:
         body+='<label class="post-select" hidden><input type="checkbox" name="post" form="post-bulk" value="'+esc(json.dumps([p['platform'],p['post_id']],separators=(',',':')))+'" aria-label="Select post"></label>'
         body+='<form class="post-delete" method="post" action="/posts-action"><input type="hidden" name="csrf" value="'+esc(csrf)+'"><input type="hidden" name="return_view" value="'+esc(return_view)+'"><input type="hidden" name="post" value="'+esc(json.dumps([p['platform'],p['post_id']],separators=(',',':')))+'"><input type="hidden" name="action" value="delete"><button title="Delete post" aria-label="Delete post">&#10006;</button></form>'
-    if p.get('publication_blocked'):body+='<p class="bad">Explicit test-purpose-only content is excluded from the public feed.</p>'
     if p.get('source_unavailable'):body+='<p class="bad">Original post is deleted or unavailable. Hidden from the public feed.</p>'
     body+='<p class="content">'+esc(p['text'])+'</p>'
     url=safe_url(p['post_url'])
