@@ -20,7 +20,7 @@ from .feed_ui import feed_body, mock_body, appearance_overrides
 from .source_config import configure_source, find_source, identity, add_platform
 from .source_connections import choices
 from .linkedin import OAuth, Credentials
-from .web_editorial import initialize, items, decide, publishable, create_announcement, edit_announcement, set_order, presentation, save_presentation
+from .web_editorial import initialize, items, decide, bulk_action, publishable, create_announcement, edit_announcement, set_order, presentation, save_presentation
 
 def esc(value): return html.escape(str(value or ''),quote=True)
 
@@ -41,6 +41,9 @@ def card(p,csrf=None,show_origin=True,return_view="pending"):
     status=p.get('editorial_status','approved' if not csrf else 'pending')
     label='PUBLISHED' if status=='approved' else 'REJECTED' if status=='rejected' else 'NEEDS REVIEW'
     body='<article data-platform="'+esc(p['platform'])+'" data-post-id="'+esc(p['post_id'])+'"><span class="post-status badge '+('good' if status=='approved' else 'bad' if status=='rejected' else 'warn')+'">'+label+'</span><small>'+(esc(p['platform'])+' · '+esc(p['account_id'])+' · ' if show_origin else '')+esc(p['created_at'] or 'Time unavailable')+'</small>'
+    if csrf:
+        body+='<label class="post-select" hidden><input type="checkbox" name="post" form="post-bulk" value="'+esc(json.dumps([p['platform'],p['post_id']],separators=(',',':')))+'" aria-label="Select post"></label>'
+        body+='<form class="post-delete" method="post" action="/posts-action"><input type="hidden" name="csrf" value="'+esc(csrf)+'"><input type="hidden" name="return_view" value="'+esc(return_view)+'"><input type="hidden" name="post" value="'+esc(json.dumps([p['platform'],p['post_id']],separators=(',',':')))+'"><input type="hidden" name="action" value="delete"><button title="Delete post" aria-label="Delete post">&#10006;</button></form>'
     body+='<p class="content">'+esc(p['text'])+'</p>'
     url=safe_url(p['post_url'])
     if url: body+='<a target="_blank" rel="noopener noreferrer" href="'+esc(url)+'">Original post</a>'
@@ -198,7 +201,8 @@ def make_handler(db,password,host='127.0.0.1',port=5000,runtime=None,dev_enabled
             session=self.session()
             try:length=int(self.headers.get('Content-Length','0'))
             except ValueError: return self.send(400,page('Invalid request',''))
-            if not 0<length<=16384:return self.send(400,page('Invalid request',''))
+            limit=131072 if urlparse(self.path).path=='/posts-action' else 16384
+            if not 0<length<=limit:return self.send(400,page('Invalid request',''))
             data=parse_qs(self.rfile.read(length).decode('utf-8',errors='replace'))
             value=lambda k:data.get(k,[''])[0]
             if not session or not hmac.compare_digest(value('csrf'),session['csrf']):return self.send(403,page('Request expired','Refresh the page and try again.'))
@@ -351,6 +355,19 @@ def make_handler(db,password,host='127.0.0.1',port=5000,runtime=None,dev_enabled
                     with closing(self.db_connection()) as conn:create_announcement(conn,value('text'),actor=self.actor())
                 except ValueError as exc:return self.send(400,page('Invalid announcement',esc(exc)))
                 return self.redirect('/admin')
+            if route=='/posts-action':
+                try:
+                    raw=data.get('post',[])
+                    if not 1<=len(raw)<=200:raise ValueError('Select 1–200 posts')
+                    keys=[json.loads(key) for key in raw]
+                    if any(not isinstance(key,list) or len(key)!=2 or any(not isinstance(v,str) for v in key) for key in keys):raise ValueError('Invalid selection')
+                    with closing(self.db_connection()) as conn:count=bulk_action(conn,keys,value('action'),actor=self.actor())
+                except (ValueError,TypeError) as exc:return self.send(400,page('Action unavailable','<p>'+esc(exc)+'</p>'))
+                destination=value('return_view')
+                if destination not in ('approved','pending','rejected'):destination='pending'
+                from urllib.parse import urlencode
+                message=str(count)+' post(s) '+{'delete':'deleted. They can be fetched again if available in the source fetch window.','approve':'published.','reject':'rejected.'}[value('action')]
+                return self.redirect('/admin?'+urlencode(dict(view=destination,notice=message)))
             if route!='/action':return self.send(404,page('Not found',''))
             try:
                 with closing(self.db_connection()) as conn:decide(conn,value('platform'),value('post_id'),value('action'),actor=self.actor())

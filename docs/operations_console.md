@@ -70,3 +70,14 @@ Jobs, source retrieval and run history use that workspace; opening the page does
 not run tests or contact providers. Authentication and CSRF remain required.
 Bluesky E2E performs one explicit fetch without automatic indexing retries.
 The legacy standalone server still accepts its explicit developer-tools flag.
+
+Post management: Review Queue, Published and Rejected provide a red × on each
+post and Select posts / Select all for bulk Delete, Publish and Reject (up to
+200 displayed posts). Publish keeps one representative per duplicate group.
+Deletion removes workspace-local content, decisions, suggestions and notification
+tracking, then rebuilds duplicate membership. Audit events remain. Source fetch
+boundaries are reset without enabling polling or clearing rate-limit cooldowns;
+Bluesky boundaries reset across the workspace platform because handles and DIDs
+may differ. A subsequent explicit fetch can re-ingest deleted posts as pending
+if they are still available within that source's configured recent fetch window.
+Deletion never removes the original post from its social platform.

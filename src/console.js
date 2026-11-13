@@ -75,11 +75,30 @@
   }
   document.addEventListener('change', event => { if (event.target.closest('.mock-controls')) updateMock(); });
   document.addEventListener('click', async event => {
+    const multi = event.target.closest('[data-multi-select]');
+    if (multi) {
+      const active = multi.getAttribute('aria-pressed') !== 'true';
+      multi.setAttribute('aria-pressed', String(active)); multi.textContent = active ? 'Cancel selection' : 'Select posts';
+      document.getElementById('post-bulk').hidden = !active;
+      document.querySelectorAll('.post-select').forEach(label => { label.hidden = !active; label.querySelector('input').checked = false; });
+      dirty = active; updateSelection(); return;
+    }
     const button = event.target.closest('[data-copy]');
     if (!button) return;
     const field = document.getElementById(button.dataset.copy);
     try { await navigator.clipboard.writeText(field.value); toast('Embed code copied.'); }
     catch (_) { field.focus(); field.select(); toast('Code selected. Copy it using your keyboard.', true); }
+  });
+  function updateSelection() {
+    const boxes = [...document.querySelectorAll('.post-select input')];
+    const count = boxes.filter(box => box.checked).length;
+    const all = document.querySelector('[data-select-all]');
+    if (all) { all.checked = boxes.length > 0 && count === boxes.length; all.indeterminate = count > 0 && count < boxes.length; }
+    const label = document.querySelector('[data-selection-count]'); if (label) label.textContent = count + ' selected';
+  }
+  document.addEventListener('change', e => {
+    if (e.target.matches('[data-select-all]')) document.querySelectorAll('.post-select input').forEach(box => box.checked = e.target.checked);
+    if (e.target.matches('[data-select-all],.post-select input')) { dirty = true; updateSelection(); }
   });
   document.addEventListener('input', e => { if (e.target.closest('main form')) dirty = true; });
   document.addEventListener('change', e => { if (e.target.closest('main form')) dirty = true; });
@@ -92,6 +111,7 @@
     posting = true; clearTimeout(timer);
     const buttons = [...form.querySelectorAll('button')];
     const body = new URLSearchParams(new FormData(form));
+    if (event.submitter?.name) body.set(event.submitter.name, event.submitter.value);
     buttons.forEach(button => button.disabled = true);
     try {
       const response = await fetch(url, {method:'POST', body, credentials:'same-origin', headers:{'X-ASAP-Console':'1'}, signal:AbortSignal.timeout(30000)});

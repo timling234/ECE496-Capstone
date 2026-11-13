@@ -146,3 +146,42 @@ def save_presentation(conn, accent, font_size, show_origin):
     font_size=int(font_size)
     if not 12<=font_size<=24:raise ValueError('Font size must be 12–24')
     with conn:conn.execute('INSERT OR REPLACE INTO feed_settings VALUES (1,?,?,?)',(accent,font_size,int(bool(show_origin))))
+
+
+def bulk_action(conn, keys, action, actor='admin'):
+    """Atomic workspace-local actions; deleted identities can be ingested anew."""
+    from .store_poc import process_stored
+    keys=list(dict.fromkeys(tuple(key) for key in keys))
+    if action not in ('delete','approve','reject') or not 1<=len(keys)<=200:
+        raise ValueError('Select 1–200 posts and a valid action')
+    conn.execute('BEGIN IMMEDIATE')
+    try:
+        posts={(p['platform'],p['post_id']):p for p in items(conn)}
+        if any(key not in posts for key in keys):raise ValueError('A selected post no longer exists. Refresh the selection.')
+        if action=='approve' and any(posts[key]['candidate_status']!='candidate' for key in keys):
+            raise ValueError('Only candidates can be published')
+        changed=0;groups=set()
+        for platform,post_id in keys:
+            p=posts[(platform,post_id)]
+            if action!='delete':
+                if action=='approve' and p['group'] and p['group'] in groups:continue
+                decide(conn,platform,post_id,action,actor,transaction=False)
+                if p['group']:groups.add(p['group'])
+            else:
+                for table in ('editorial_decisions','editorial_reasons','feed_order','group_approvals',
+                              'ai_suggestions','notification_seen','notification_outbox','relevance','duplicate_candidates'):
+                    if table_exists(conn,table):conn.execute('DELETE FROM '+table+' WHERE platform=? AND post_id=?',(platform,post_id))
+                if platform=='manual':conn.execute('DELETE FROM manual_versions WHERE post_id=?',(post_id,))
+                conn.execute('DELETE FROM posts WHERE platform=? AND post_id=?',(platform,post_id))
+                # Bluesky may be configured by handle while records use DID. Reset
+                # that platform's boundaries, retaining cooldowns and polling switches.
+                if table_exists(conn,'source_poll_state'):
+                    conn.execute('UPDATE source_poll_state SET checkpoint=NULL WHERE platform=?'+(' AND account=?' if platform!='bluesky' else ''),
+                                 (platform,p['account_id']) if platform!='bluesky' else (platform,))
+                conn.execute('INSERT INTO editorial_actions(platform,post_id,action,actor,acted_at) VALUES (?,?,?,?,?)',
+                             (platform,post_id,'delete',actor,datetime.now(timezone.utc).isoformat()))
+            changed+=1
+        if action=='delete':process_stored(conn)
+        conn.commit();return changed
+    except Exception:
+        conn.rollback();raise
