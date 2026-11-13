@@ -267,6 +267,8 @@ class SocialTests(unittest.TestCase):
     def test_remove_and_restore_saved_connection_without_deleting_posts_or_other_tenant(self):
         state,_=self.start(self.a,'x');self.callback(self.a,'x',state)
         runtime=self.ws.get(self.alice['id']).runtime
+        with sqlite3.connect(runtime.db) as conn:
+            conn.execute("INSERT INTO source_poll_state(source_key,platform,account,checkpoint,next_poll_at,error_code,fetched_count,new_count,updated_count,unavailable_count,unchecked_count) VALUES ('x:12345','x','12345','keep-checkpoint',9999999999,429,5,3,2,1,4)")
         token=csrf(self.a.get('/admin'))
         self.a.post('/announcement',data=dict(csrf=token,text='Keep this announcement'))
         self.assertEqual(self.b.post('/source-remove',data=dict(csrf=csrf(self.b.get('/admin')),source_key='x:12345')).status_code,400)
@@ -280,6 +282,10 @@ class SocialTests(unittest.TestCase):
         self.assertEqual(self.b.post('/source-save',data=dict(csrf=csrf(self.b.get('/admin')),**data)).status_code,400)
         self.assertEqual(self.a.post('/source-save',data=dict(csrf=token,**data)).status_code,303)
         self.assertFalse(runtime.read_config()['sources'][-1]['enabled'])
+        row=next(s for s in runtime.snapshot() if s.get('account')=='12345')
+        self.assertEqual([row[k] for k in ('fetched_count','new_count','updated_count','unavailable_count','unchecked_count')],[0,0,0,0,0])
+        self.assertEqual((row['checkpoint'],row['next_poll_at'],row['error_code']),('keep-checkpoint',9999999999,429))
+        self.assertIn(b'Keep this announcement',self.a.get('/admin?view=pending').data)
         self.assertEqual(len(self.calls),2)  # Add/remove did not call a provider.
 
     def test_source_editor_uses_icons_and_server_owned_connected_account(self):

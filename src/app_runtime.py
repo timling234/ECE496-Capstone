@@ -65,6 +65,10 @@ class AppRuntime:
             config['sources'].remove(source)
             self.save_config(config)
             self.pending.discard(key)
+            # A re-added source starts with empty result counters. Keep stored
+            # posts, decisions, checkpoints and provider cooldown/error evidence.
+            with closing(sqlite3.connect(self.db,timeout=15)) as conn:
+                conn.execute('UPDATE source_poll_state SET fetched_count=0,new_count=0,updated_count=0,unavailable_count=0,unchecked_count=0 WHERE source_key=?',(key,));conn.commit()
 
     def sources(self):
         with self.lock:return self.loader(self.config_path)
