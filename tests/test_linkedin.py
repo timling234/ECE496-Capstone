@@ -40,7 +40,7 @@ class LinkedInTests(unittest.TestCase):
             if url.endswith('/accessToken'):
                 return dict(access_token='PRIVATE-TOKEN',refresh_token='PRIVATE-REFRESH',
                             expires_in=3600,refresh_token_expires_in=31536000,
-                            scope='r_organization_social,rw_organization_admin')
+                            scope='r_organization_social,rw_organization_admin,w_organization_social')
             if '/organizationAcls?' in url:
                 return dict(elements=[dict(organization='urn:li:organization:143906318',
                     role='ADMINISTRATOR',state='APPROVED',**{'organization~':{'localizedName':'ASAP Test Lab'}})],paging={})
@@ -68,25 +68,30 @@ class LinkedInTests(unittest.TestCase):
         self.assertEqual(len(batch.posts[0]['media']),2)
         self.assertEqual(batch.posts[0]['media'][0]['alt'],'Test poster')
 
-    def test_posting_scope_is_explicit_and_must_be_granted(self):
-        from urllib.parse import urlparse,parse_qs
+    def test_fetch_and_posting_share_scopes_and_saved_connection(self):
+        from src.linkedin import AUTH_SCOPES,connect_pages,posting_connections
         session=self.session()
-        url,nonce=self.oauth.begin(session)
-        self.assertNotIn('w_organization_social',parse_qs(urlparse(url).query)['scope'][0])
-        url,nonce=self.oauth.begin(session,publish=True)
-        query=parse_qs(urlparse(url).query)
-        self.assertIn('w_organization_social',query['scope'][0])
-        with self.assertRaises(ValueError):self.oauth.finish(query['state'][0],nonce,'fixture-code')
-        self.assertFalse(list(self.credentials.directory.glob('*.json')))
+        fetch_url,_=self.oauth.begin(session)
+        post_url,nonce=self.oauth.begin(session,publish=True)
+        self.assertEqual(set(parse_qs(urlparse(fetch_url).query)['scope'][0].split()),AUTH_SCOPES)
+        self.assertEqual(parse_qs(urlparse(fetch_url).query)['scope'],parse_qs(urlparse(post_url).query)['scope'])
         original=self.oauth.request
-        def grant_write(*args,**kwargs):
-            result=original(*args,**kwargs)
-            result['scope']+=',w_organization_social'
-            return result
-        self.oauth.request=grant_write
+        self.oauth.request=lambda *a,**kw:dict(original(*a,**kw),scope='r_organization_social,rw_organization_admin')
+        with self.assertRaises(ValueError):self.oauth.finish(parse_qs(urlparse(post_url).query)['state'][0],nonce,'missing-write')
+        self.oauth.request=original
         url,nonce=self.oauth.begin(session,publish=True)
         self.oauth.finish(parse_qs(urlparse(url).query)['state'][0],nonce,'new-code')
-        self.assertIn('w_organization_social',self.credentials.read(session['linkedin_choice']['connection'])['scope'])
+        choice=self.oauth.pages(session)
+        runtime=AppRuntime(self.root/'asap.sqlite3')
+        runtime.save_config({'sources':[dict(platform='linkedin',account='143906318',name='My lab',enabled=False,interval_seconds=3600,page_size=10)]},validate=False)
+        self.assertEqual(connect_pages(runtime,choice),['143906318'])
+        saved=runtime.read_config()['sources'][0]
+        self.assertEqual((saved['name'],saved['interval_seconds'],saved['page_size']),('My lab',3600,10))
+        self.assertFalse(saved['enabled'])
+        reopened=Credentials(self.root/'linkedin_credentials')
+        self.assertEqual(posting_connections(runtime.read_config(),reopened)[0]['connection'],saved['connection_id'])
+        self.assertEqual(reopened.access_token(saved['connection_id']),'PRIVATE-TOKEN')
+        self.assertEqual(len(self.calls),3)  # Denied exchange, successful exchange, one ACL read; no post write.
 
     def test_oauth_binds_browser_state_session_and_consumes_code_once(self):
         session=self.session();url,nonce=self.oauth.begin(session);state=parse_qs(urlparse(url).query)['state'][0]
@@ -198,13 +203,13 @@ class LinkedInTests(unittest.TestCase):
         self.assertEqual(http('/linkedin/connect',{'csrf':'bad'})[0],403)
         status,_,url=http('/linkedin/connect',{'csrf':csrf});self.assertEqual(status,303)
         state=parse_qs(urlparse(url).query)['state'][0]
-        self.assertEqual(http('/linkedin/callback?'+urlencode({'state':state,'code':'fixture-code'}),callback=True)[0],200)
-        self.assertEqual(len(self.calls),1) # Only code exchange; no hidden Page or post fetch.
-        self.assertEqual(http('/linkedin/pages',{'csrf':csrf})[0],303)
+        status,_,location=http('/linkedin/callback?'+urlencode({'state':state,'code':'fixture-code'}),callback=True)
+        self.assertEqual(status,303)
+        self.assertIn('view=sources',location)
+        self.assertEqual(len(self.calls),2) # Code exchange + one Page validation, no post fetch.
+        # Refreshing/restarting a local view reuses the saved connection.
+        http('/admin?view=sources')
         self.assertEqual(len(self.calls),2)
-        _,choices,_=http('/linkedin/choose');self.assertIn('ASAP Test Lab',choices)
-        self.assertEqual(http('/linkedin/select',{'csrf':csrf,'organization':'999'})[0],400)
-        self.assertEqual(http('/linkedin/select',{'csrf':csrf,'organization':'143906318'})[0],303)
         saved=runtime.read_config()['sources'][0]
         self.assertFalse(saved['enabled']);self.assertEqual(saved['interval_seconds'],1800)
         runtime.tick();self.assertEqual(len(self.calls),2)

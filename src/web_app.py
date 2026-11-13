@@ -19,7 +19,7 @@ from . import notifications
 from .feed_ui import feed_body, mock_body, appearance_overrides
 from .source_config import configure_source, find_source, identity, add_platform
 from .source_connections import choices
-from .linkedin import OAuth, Credentials
+from .linkedin import OAuth, Credentials, connect_pages, posting_connections
 from .web_editorial import initialize, items, decide, bulk_action, publishable, create_announcement, edit_announcement, set_order, presentation, save_presentation
 
 def esc(value): return html.escape(str(value or ''),quote=True)
@@ -159,6 +159,12 @@ def make_handler(db,password,host='127.0.0.1',port=5000,runtime=None,dev_enabled
                         raise ValueError('Invalid LinkedIn callback')
                     linked_session=self.linkedin_oauth.finish(values['state'][0],nonce.value if nonce else '',
                         values.get('code',[''])[0],denied='error' in values)
+                    choice=self.linkedin_oauth.pages(linked_session)
+                    connected=connect_pages(self.runtime,choice)
+                    if connected:
+                        view=choice.get('return_view','sources')
+                        linked_session.pop('linkedin_choice',None)
+                        return self.redirect('/admin?view='+view+'&notice=LinkedIn+connected.+Fetch+and+test+posting+share+this+saved+authorization.',oauth_cookie+'=; HttpOnly; SameSite=Lax; Path=/linkedin/callback; Max-Age=0'+cookie_secure)
                     body=linkedin_choices(linked_session)
                     return self.send(200,page('LinkedIn connected',body),oauth_cookie+'=; HttpOnly; SameSite=Lax; Path=/linkedin/callback; Max-Age=0'+cookie_secure)
                 except Exception:
@@ -197,7 +203,7 @@ def make_handler(db,password,host='127.0.0.1',port=5000,runtime=None,dev_enabled
                 conn.commit()
                 history=conn.execute('SELECT action,platform,post_id,actor,acted_at FROM editorial_actions ORDER BY id DESC LIMIT 20').fetchall()
             body=render_console(posts,history,settings,self.read_config(),session,view,esc,card,self.runtime,self.devtools,
-                query.get('notice',[''])[0],query=query,ai_panel=getattr(self,'ai_panel',None),connection_choices=choices(self.read_config(),self.config_path.parent),notification_config=notification_config,notification_state=notification_state,feed_url=getattr(self,'feed_url',None))
+                query.get('notice',[''])[0],query=query,linkedin_posting=posting_connections(self.read_config(),self.linkedin_oauth.credentials),ai_panel=getattr(self,'ai_panel',None),connection_choices=choices(self.read_config(),self.config_path.parent),notification_config=notification_config,notification_state=notification_state,feed_url=getattr(self,'feed_url',None))
             self.send(200,page('ASAP Admin',body,console=True))
         def do_POST(self):
             session=self.session()
@@ -221,7 +227,9 @@ def make_handler(db,password,host='127.0.0.1',port=5000,runtime=None,dev_enabled
             if not session['authenticated']:return self.send(403,page('Sign in required',''))
             if route=='/linkedin/connect':
                 if not self.runtime:return self.send(400,page('LinkedIn unavailable','The source runtime is required.'))
-                try:url,nonce=self.linkedin_oauth.begin(session,publish=True) if value('publish_mock')=='1' else self.linkedin_oauth.begin(session)
+                if value('publish_mock')=='1' and posting_connections(self.read_config(),self.linkedin_oauth.credentials):
+                    return self.redirect('/admin?view=testing&notice=LinkedIn+is+already+authorized+for+Fetch+and+test+posting.')
+                try:url,nonce=self.linkedin_oauth.begin(session,publish=value('publish_mock')=='1')
                 except ValueError as error:return self.send(400,page('LinkedIn setup required',esc(error)))
                 return self.redirect(url,oauth_cookie+'='+nonce+'; HttpOnly; SameSite=Lax; Path=/linkedin/callback; Max-Age=600'+cookie_secure)
             if route=='/linkedin/pages':
@@ -234,23 +242,10 @@ def make_handler(db,password,host='127.0.0.1',port=5000,runtime=None,dev_enabled
                     choice=session.get('linkedin_choice')
                     if not choice or choice['expires']<=time.time() or value('organization') not in choice['pages']:
                         raise ValueError('Choose a Page returned by your LinkedIn authorization')
-                    with self.runtime.lock:
-                        config=self.runtime.read_config()
-                        account=value('organization')
-                        source=find_source(config,'linkedin:'+account)
-                        if source is None:
-                            source=find_source(config,'linkedin:')
-                        if source is None:
-                            source=dict(platform='linkedin',account=account)
-                            config['sources'].append(source)
-                        source['account']=account
-                        source.pop('draft',None)
-                        source.update(connection_id=choice['connection'],label=choice['pages'][account],
-                                      enabled=False,interval_seconds=1800,page_size=100)
-                        config['sources']=[s for s in config['sources'] if not (s['platform']=='linkedin' and not s.get('account'))]
-                        self.runtime.save_config(config)
-                        session.pop('linkedin_choice',None)
-                    return self.redirect('/admin?view=sources&notice=LinkedIn+Page+connected.+Use+Fetch+Now+when+ready.')
+                    connect_pages(self.runtime,choice,value('organization'))
+                    view=choice.get('return_view','sources')
+                    session.pop('linkedin_choice',None)
+                    return self.redirect('/admin?view='+view+'&notice=LinkedIn+Page+connected.+Fetch+and+test+posting+are+ready.')
                 except ValueError as error:return self.send(400,page('LinkedIn Page unavailable',esc(error)))
             if route=='/logout':
                 session['expires']=0

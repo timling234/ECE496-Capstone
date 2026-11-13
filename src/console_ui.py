@@ -33,7 +33,7 @@ def stamp(value):
     return datetime.fromtimestamp(value,timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC') if value is not None else 'Never'
 
 
-def render_console(posts,history,settings,config,session,view,esc,card,runtime=None,devtools=None,notice='',query=None,notification_config=None,notification_state=None,feed_url=None,connection_choices=None,ai_panel=None):
+def render_console(posts,history,settings,config,session,view,esc,card,runtime=None,devtools=None,notice='',query=None,notification_config=None,notification_state=None,feed_url=None,connection_choices=None,ai_panel=None,linkedin_posting=None):
     query=query or {}
     connection_choices=connection_choices or []
     csrf=session['csrf']
@@ -112,7 +112,11 @@ def render_console(posts,history,settings,config,session,view,esc,card,runtime=N
             account,password=credentials()
             body+='</section><section class="panel"><h2>Bluesky test post generator</h2><p>Explicit test account: <b>'+esc(account or 'Not configured')+'</b> · '+badge('Ready' if account and password else 'Credentials needed')+'</p><p><small>Publishing is independent of configured retrieval sources. Credentials never enter the browser.</small></p><form method="post" action="/dev-task"><input type="hidden" name="csrf" value="'+csrf+'"><input type="hidden" name="test_id" value="publish-bluesky"><label>Text<br><textarea name="text" rows="3" maxlength="300" required placeholder="Bluesky test post text"></textarea></label><br><button '+('disabled' if not account or not password or devtools.active else '')+'>Publish Test Post</button></form><p>'+form('/dev-task',{'test_id':'e2e-bluesky'},'Run Bluesky E2E Test',not account or not password or devtools.active)+'<small>Real post → fetch → candidate; never auto-approves.</small></p></section>'
             if not account or not password:body+='<p class="notice">One-time local setup: python run_app.py --configure-bluesky-test. Enter the test handle and app password in the terminal; never paste credentials here.</p>'
-            body+='<section class="panel"><h2>LinkedIn test posting</h2><p>Authorize organization posting for the prepared mock-post batch. Authorizing does not publish any post.</p>'+form('/linkedin/connect',{'publish_mock':'1'},'Authorize LinkedIn test posting')+'</section>'
+            body+='<section class="panel"><h2>LinkedIn test posting</h2><p>Fetch and test posting use the same saved LinkedIn connection. Connecting does not publish any post.</p>'
+            if linkedin_posting:
+                body+=''.join('<p>'+badge('Authenticated')+' '+esc(row['label'])+' · Fetch + test posting · <small>Access token expires: '+esc(stamp(row['expires_at']))+'</small></p>' for row in linkedin_posting)
+            else:body+=form('/linkedin/connect',{'publish_mock':'1'},'Authorize LinkedIn — Fetch + test posting')
+            body+='</section>'
             body+='<section class="panel"><h2>X test posting</h2><p>Pending verified user-context write authorization. The current retrieval bearer-token setup does not establish posting permission.</p></section>'
             body+='<section class="panel"><h2>Recent test runs</h2>'
             for run in runs:

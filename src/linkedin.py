@@ -13,6 +13,9 @@ from urllib.request import Request, build_opener, HTTPRedirectHandler
 from .linkedin_text import decode as plain_text
 
 SCOPES = {'r_organization_social', 'rw_organization_admin'}
+# LinkedIn invalidates earlier grants when the requested scope set changes.
+# Both connection entry points must use this same app-wide permission bundle.
+AUTH_SCOPES = SCOPES | {'w_organization_social'}
 LOCK = threading.RLock()
 
 
@@ -166,13 +169,13 @@ class OAuth:
     def begin(self, session, publish=False):
         config = self.config_getter()
         validate_settings(config)
-        requested_scopes=SCOPES | ({'w_organization_social'} if publish else set())
+        requested_scopes=AUTH_SCOPES
         state, nonce = secrets.token_urlsafe(32), secrets.token_urlsafe(32)
         with self.lock:
             self.pending = {k: v for k, v in self.pending.items() if v['expires'] > self.clock()}
             if len(self.pending) >= 100:
                 raise ValueError('Too many pending LinkedIn connections; try later')
-            self.pending[state] = dict(nonce=nonce, session=session, expires=self.clock()+600, config=config, requested_scopes=requested_scopes)
+            self.pending[state] = dict(nonce=nonce, session=session, expires=self.clock()+600, config=config, requested_scopes=requested_scopes,return_view='testing' if publish else 'sources')
         url = 'https://www.linkedin.com/oauth/v2/authorization?' + urlencode({
             'response_type': 'code', 'client_id': config['client_id'], 'redirect_uri': config['redirect_uri'],
             'scope': ' '.join(sorted(requested_scopes)), 'state': state})
@@ -196,7 +199,7 @@ class OAuth:
             raise ValueError('LinkedIn did not grant the requested permissions')
         connection = self.credentials.save_grant(payload)
         session['linkedin_choice'] = dict(connection=connection, pages={}, start=0, more=True,
-                                          expires=self.clock()+600)
+                                          expires=self.clock()+600,return_view=pending['return_view'])
         return session
 
     def pages(self, session, more=False):
@@ -226,6 +229,54 @@ class OAuth:
         if isinstance(paging.get('total'), int):
             choice['more'] = choice['start'] < paging['total']
         return choice
+
+
+def posting_connections(config,credentials):
+    result=[]
+    for source in config['sources']:
+        if source.get('platform')!='linkedin' or not source.get('connection_id') or source.get('draft'):continue
+        try:
+            grant=credentials.read(source['connection_id'])
+            scopes=set(re.split(r'[ ,]+',grant.get('scope','')))
+            if grant.get('revoked') or not AUTH_SCOPES.issubset(scopes):continue
+            access_ok=bool(grant.get('access_token')) and grant.get('expires_at',0)>credentials.clock()+300
+            refresh_ok=bool(grant.get('refresh_token')) and grant.get('refresh_expires_at',0)>credentials.clock()
+            if access_ok or refresh_ok:
+                result.append(dict(account=source['account'],connection=source['connection_id'],label=source.get('label') or source['account'],expires_at=grant.get('expires_at'),authenticated_at=grant.get('authenticated_at',0)))
+        except (ValueError,OSError,TypeError):continue
+    return sorted(result,key=lambda row:row['authenticated_at'],reverse=True)
+
+
+def connect_pages(runtime,choice,account=None):
+    """Bind a validated Page grant immediately; preserve retrieval preferences."""
+    from .source_config import find_source
+    from .source_connections import remember
+    if not choice or choice['expires']<=time.time() or not choice.get('loaded'):
+        raise ValueError('Connect LinkedIn again to choose a Page')
+    if account is not None and account not in choice['pages']:
+        raise ValueError('Choose a Page returned by your LinkedIn authorization')
+    with runtime.poll_lock, runtime.lock:
+        config=runtime.read_config()
+        accounts=([account] if account is not None else [s['account'] for s in config['sources'] if s.get('platform')=='linkedin' and s.get('account') in choice['pages']])
+        if not accounts and len(choice['pages'])==1:accounts=list(choice['pages'])
+        for selected in accounts:
+            source=find_source(config,'linkedin:'+selected) or find_source(config,'linkedin:')
+            if source is None:
+                source=dict(platform='linkedin');config['sources'].append(source)
+            source.update(account=selected,connection_id=choice['connection'],label=choice['pages'][selected])
+            source.pop('draft',None)
+            source.setdefault('enabled',False);source.setdefault('interval_seconds',1800);source.setdefault('page_size',100)
+        if accounts:
+            config['sources']=[s for s in config['sources'] if not (s['platform']=='linkedin' and not s.get('account'))]
+            runtime.save_config(config)
+            for source in config['sources']:
+                if source.get('platform')=='linkedin' and source.get('account') in accounts:remember(source,runtime.config_path.parent)
+            # Clear only obsolete authentication failures; retain rate-limit cooldowns.
+            import sqlite3
+            with sqlite3.connect(runtime.db,timeout=15) as conn:
+                for selected in accounts:
+                    conn.execute("UPDATE source_poll_state SET error_type=NULL,error_code=NULL WHERE source_key=? AND (error_code=401 OR error_type='ReconnectRequired')",('linkedin:'+selected,))
+        return accounts
 
 
 def normalize(post, account, label=None, image_assets=None):

@@ -37,26 +37,34 @@ keys client_id, client_secret, redirect_uri. Never commit actual credentials.
 1. Start python run_app.py and sign into the admin console.
 2. Sources -> + Add Source -> LinkedIn -> Choose provider -> Authenticate.
 3. Sign in on LinkedIn and approve Page access. This requests r_organization_social
-   for posts and rw_organization_admin to discover the Pages the member administers.
+   for posts, rw_organization_admin to discover administered Pages, and
+   w_organization_social for explicitly requested test posting. Both entry points
+   always request this same bundle: LinkedIn invalidates earlier tokens if scopes change.
    The latter scope is broader than read-only despite being used only for a GET.
-4. LinkedIn returns to this application's /linkedin/callback. Click Load my Pages,
-   then Connect this Page for one of the returned organization Pages. The Page list
+4. LinkedIn returns to /linkedin/callback. One organizationAcls read validates Pages,
+   then existing configured Pages (or the only eligible Page) are connected automatically.
+   Multiple unfamiliar Pages still require explicit selection. The Page list
    is cached during selection; refreshing the screen does not call LinkedIn again.
    If names are not returned, the numeric Page ID and View Page link identify it.
 5. The source is saved with polling DISABLED. Click Fetch Now to pull one recent
    page (up to 100 posts) into the Store and administrator Review Queue.
 6. To connect another Page, repeat Authenticate; connections may share the same
    authorized member, but every chosen Page must appear in the authorization's
-   eligible Page list. Existing Page reconnection disables polling until re-enabled.
+   eligible Page list. Existing Page reconnection preserves names, intervals, page sizes and polling switches.
 
 The connecting member needs an appropriate Page role. This discovery flow uses
 rw_organization_admin, so use a Page administrator with the required organization
 admin privileges. An account that only follows a Page cannot connect it. Personal
-member-post reading is not supported. No posting scopes or API writes are used.
+member-post reading is not supported. Fetch never writes a social post. Posting
+requires an explicit publishing action even after the shared connection is authorized.
 
 ## Quota and supported data
 
-- No post request occurs on OAuth return, Page selection or screen refresh.
+- OAuth return makes one Page-role validation request, but no post fetch or write.
+- The token and selected Page persist in the workspace private credential/config files.
+- Testing shows Authenticated instead of asking for authorization again when a valid
+  combined grant is saved. Both functions reuse it; natural expiry/revocation still
+  requires reconnection when refresh is unavailable.
 - Load my Pages makes one organizationAcls request. Load more is explicit when
   LinkedIn indicates another page. Repeat screen views reuse the cached response.
 - Fetch Now makes one posts request, no implicit retries, pagination, or media calls.
@@ -136,3 +144,5 @@ Published single-image and multi-image posts now resolve their image URNs using
 one bounded Images API batch per pull, rather than a request per picture.
 Read-only grants that receive 403/404 from image resolution retain the post text.
 Post eligibility and manual editorial decisions remain unchanged.
+
+Scope behavior reference: https://learn.microsoft.com/en-us/linkedin/shared/authentication/authorization-code-flow
