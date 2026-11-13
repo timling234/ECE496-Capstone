@@ -15,6 +15,9 @@ def placeholder_test_post(post):
 
 
 def recommendation(post):
+    md=post.get("metadata",{})
+    if md.get("is_repost") and md.get("original_resolution")!="available":
+        return dict(recommendation="needs_review",reason="LinkedIn returned a repost reference but did not provide the original content. Review it on LinkedIn; this is an API availability check, not model inference.")
     if explicit_test_post(post):
         return dict(recommendation='reject',reason='Publishing rule: this post explicitly declares itself mock/test-purpose-only content. It must not enter the public news feed. This is a deterministic policy check, not model inference.')
     if placeholder_test_post(post):

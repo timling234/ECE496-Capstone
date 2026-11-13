@@ -16,7 +16,11 @@
         "avatar": null,
         "date": "2026-10-20T05:45:05+00:00",
         "url": "https://www.linkedin.com/posts/activity-7517996998277488640-XSSs"
-      }
+      },
+      "is_repost": true,
+      "original_resolution": "available",
+      "reposted_at": "2026-10-20T05:45:05+00:00",
+      "source_account_name": "Middleware Systems Research Group (MSRG)"
     }
   },
   {
@@ -49,7 +53,11 @@
         "avatar": "/assets/reference/avatar-2.jpg",
         "date": "2026-10-20T05:43:02+00:00",
         "url": "https://www.linkedin.com/posts/ytian285_cloud-aiops-sre-ugcPost-7516590742514012160-wzzo"
-      }
+      },
+      "is_repost": true,
+      "original_resolution": "available",
+      "reposted_at": "2026-10-20T05:43:02+00:00",
+      "source_account_name": "Middleware Systems Research Group (MSRG)"
     }
   },
   {
@@ -86,7 +94,11 @@
         "avatar": "/assets/reference/avatar-2.jpg",
         "date": "2026-10-06T11:33:24+00:00",
         "url": "https://www.linkedin.com/posts/ytian285_agentops-ase2026-aiops-activity-7513182650535415808-s6sl"
-      }
+      },
+      "is_repost": true,
+      "original_resolution": "available",
+      "reposted_at": "2026-10-06T11:33:24+00:00",
+      "source_account_name": "Middleware Systems Research Group (MSRG)"
     }
   },
   {
@@ -119,7 +131,11 @@
         "avatar": "/assets/reference/avatar-3.jpg",
         "date": "2026-10-06T04:38:45+00:00",
         "url": "https://www.linkedin.com/posts/tianyinxu_sregym-sregym-sregym-ugcPost-7509349205291909120-GwVi"
-      }
+      },
+      "is_repost": true,
+      "original_resolution": "available",
+      "reposted_at": "2026-10-06T04:38:45+00:00",
+      "source_account_name": "Middleware Systems Research Group (MSRG)"
     }
   }
 ]

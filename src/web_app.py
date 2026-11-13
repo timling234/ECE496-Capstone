@@ -40,11 +40,12 @@ def page(title,body,settings=None,console=False):
 def card(p,csrf=None,show_origin=True,return_view="pending"):
     status=p.get('editorial_status','approved' if not csrf else 'pending')
     label='PUBLISHED' if status=='approved' else 'REJECTED' if status=='rejected' else 'NEEDS REVIEW'
-    body='<article data-platform="'+esc(p['platform'])+'" data-post-id="'+esc(p['post_id'])+'"><span class="post-status badge '+('good' if status=='approved' else 'bad' if status=='rejected' else 'warn')+'">'+label+'</span><small>'+(esc(p['platform'])+' · '+esc(p['account_id'])+' · ' if show_origin else '')+esc(p['created_at'] or 'Time unavailable')+'</small>'
+    body='<article data-platform="'+esc(p['platform'])+'" data-post-id="'+esc(p['post_id'])+'"><span class="post-status badge '+('good' if status=='approved' else 'bad' if status=='rejected' else 'warn')+'">'+label+'</span><small>'+(esc(p['platform'])+' · '+esc(p.get('metadata',{}).get('source_account_name') or p.get('metadata',{}).get('source_label') or p['account_id'])+' · ' if show_origin else '')+esc(p['created_at'] or 'Time unavailable')+'</small>'
     if csrf:
         body+='<label class="post-select" hidden><input type="checkbox" name="post" form="post-bulk" value="'+esc(json.dumps([p['platform'],p['post_id']],separators=(',',':')))+'" aria-label="Select post"></label>'
         body+='<form class="post-delete" method="post" action="/posts-action"><input type="hidden" name="csrf" value="'+esc(csrf)+'"><input type="hidden" name="return_view" value="'+esc(return_view)+'"><input type="hidden" name="post" value="'+esc(json.dumps([p['platform'],p['post_id']],separators=(',',':')))+'"><input type="hidden" name="action" value="delete"><button title="Delete post" aria-label="Delete post">&#10006;</button></form>'
     if p.get('source_unavailable'):body+='<p class="bad">Original post is deleted or unavailable. Hidden from the public feed.</p>'
+    if p.get('metadata',{}).get('is_repost') and p['metadata'].get('original_resolution')!='available':body+='<p class="notice">Repost found. LinkedIn did not provide the original content ('+esc(p['metadata'].get('original_resolution','unverified'))+'). Open the original on LinkedIn; this item requires human review.</p><p><a href="'+esc(safe_url(p['metadata'].get('original_post_url','')))+'" target="_blank" rel="noopener noreferrer">View original on LinkedIn ↗</a></p>'
     body+='<p class="content">'+esc(p['text'])+'</p>'
     url=safe_url(p['post_url'])
     if url: body+='<a target="_blank" rel="noopener noreferrer" href="'+esc(url)+'">Original post</a>'
@@ -160,7 +161,7 @@ def make_handler(db,password,host='127.0.0.1',port=5000,runtime=None,dev_enabled
                     linked_session=self.linkedin_oauth.finish(values['state'][0],nonce.value if nonce else '',
                         values.get('code',[''])[0],denied='error' in values)
                     choice=self.linkedin_oauth.pages(linked_session)
-                    connected=connect_pages(self.runtime,choice)
+                    connected=connect_pages(self.runtime,choice,credentials=self.linkedin_oauth.credentials)
                     if connected:
                         view=choice.get('return_view','sources')
                         linked_session.pop('linkedin_choice',None)
@@ -242,7 +243,7 @@ def make_handler(db,password,host='127.0.0.1',port=5000,runtime=None,dev_enabled
                     choice=session.get('linkedin_choice')
                     if not choice or choice['expires']<=time.time() or value('organization') not in choice['pages']:
                         raise ValueError('Choose a Page returned by your LinkedIn authorization')
-                    connect_pages(self.runtime,choice,value('organization'))
+                    connect_pages(self.runtime,choice,value('organization'),self.linkedin_oauth.credentials)
                     view=choice.get('return_view','sources')
                     session.pop('linkedin_choice',None)
                     return self.redirect('/admin?view='+view+'&notice=LinkedIn+Page+connected.+Fetch+and+test+posting+are+ready.')

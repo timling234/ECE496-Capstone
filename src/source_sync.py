@@ -17,16 +17,16 @@ def lookup(provider, posts):
         token=provider.credentials.access_token(provider.connection)
         data=provider.request('https://api.linkedin.com/rest/posts?ids=List('+','.join(quote(i,safe='') for i in ids)+')',token=token)
         if not isinstance(data.get('results'),dict):raise ValueError('Invalid batch response')
-        from .linkedin import normalize
+        from .linkedin_reposts import hydrate
         existing={m['asset_id']:dict(downloadUrl=m.get('url') or m.get('fullsize')) for p in posts for m in p['media'] if m.get('asset_id')}
         found=[];unavailable=[]
         for key,payload in data['results'].items():
             if key not in ids or payload.get('author')!='urn:li:organization:'+provider.account:raise ValueError('Invalid batch identity')
-            if payload.get('lifecycleState')=='PUBLISHED':found.append(normalize(payload,provider.account,provider.label,existing))
+            if payload.get('lifecycleState')=='PUBLISHED':found.append(payload)
             elif payload.get('lifecycleState') in ('DRAFT','DELETED','ARCHIVED'):unavailable.append(key)
         for key,error in data.get('errors',{}).items():
             if key in ids and error.get('status') in (404,410):unavailable.append(key)
-        return found,unavailable
+        return hydrate(provider,found,token,existing),unavailable
     if provider.platform=='x':
         token=provider.token_getter() if provider.token_getter else provider.token_file.read_text(encoding='utf-8-sig').strip()
         params={'ids':','.join(ids),'tweet.fields':'created_at,attachments,entities,author_id,edit_history_tweet_ids','expansions':'attachments.media_keys','media.fields':'type,url,preview_image_url,width,height'}

@@ -146,3 +146,9 @@ Read-only grants that receive 403/404 from image resolution retain the post text
 Post eligibility and manual editorial decisions remain unchanged.
 
 Scope behavior reference: https://learn.microsoft.com/en-us/linkedin/shared/authentication/authorization-code-flow
+
+## Native reposts
+
+A fetch recognizes `reshareContext.root` / `parent` and makes at most one original-post batch and one image batch, without authenticating the original author. Original read failures are retained as `metadata.original_resolution` (`permission_denied`, `unavailable`, or `unverified`), never filled from public widget snapshots. A missing original is not a complete publishable item. Current live results are documented in the November 13 meeting record.
+
+Provider-specific normalized fields are under `metadata`: `is_repost`, `author_name`, `author_id`, `author_avatar`, `source_account_name`, `source_account_id`, `reposted_by`, `reposted_at`, `original_post_id`, `parent_post_id`, `original_post_url`, `original_published_at`, `original_resolution`, and the original API object when available. `post_id` and `post_url` retain A's wrapper identity for editorial/audit actions. `created_at` uses the original publication time only when the API actually returns it. Same-original duplicate groups preserve separate source records and aggregate repost sources on the published representative.

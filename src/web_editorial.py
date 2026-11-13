@@ -25,7 +25,11 @@ def initialize(conn):
 def fingerprint(post):
     data={k:post[k] for k in ('text','created_at','post_url','links','media')}
     data['media']=[{'asset_id':m['asset_id']} if m.get('asset_id') else m for m in post['media']]
-    if post['platform']=='linkedin':data['source_content']=post.get('raw',{}).get('content')
+    if post['platform']=='linkedin':
+        data['source_content']=post.get('raw',{}).get('content')
+        if post.get('metadata',{}).get('is_repost'):
+            data['original_post_id']=post['metadata'].get('original_post_id')
+            data['original_content']=(post['metadata'].get('original_post') or {}).get('content')
     return hashlib.sha256(json.dumps(data,sort_keys=True).encode()).hexdigest()
 
 
@@ -40,6 +44,7 @@ def items(conn):
     for p in posts:
         from .publishing_policy import explicit_test_post,placeholder_test_post
         p['publication_blocked']=explicit_test_post(p) or placeholder_test_post(p)
+        p['original_content_unavailable']=bool(p['metadata'].get('is_repost') and p['metadata'].get('original_resolution')!='available')
         p['source_unavailable']=(p['platform'],p['post_id']) in unavailable
         p['pinned'],p['position']=ordering.get((p['platform'],p['post_id']),(0,0))
         key=(p['platform'],p['post_id']); d=decisions.get(key)
@@ -64,6 +69,7 @@ def decide(conn, platform, post_id, action, actor='admin', *, transaction=True):
     try:
         posts=items(conn); p=next((p for p in posts if (p['platform'],p['post_id'])==(platform,post_id)),None)
         if p is None: raise ValueError('Post not found')
+        if action=='approve' and p['original_content_unavailable']:raise ValueError('LinkedIn did not provide the original repost content; it cannot be published as a complete news item')
         if action=='approve' and p['publication_blocked']:raise ValueError('Placeholder or explicitly test-only content cannot be published')
         if action=='approve' and p['candidate_status']!='candidate': raise ValueError('Only candidates can be approved')
         now=datetime.now(timezone.utc).isoformat()
@@ -92,10 +98,13 @@ def decide(conn, platform, post_id, action, actor='admin', *, transaction=True):
 def publishable(conn):
     """FR-9: approved current candidates, at most one representative per group."""
     result=[]; seen=set()
-    for p in sorted(items(conn),key=lambda p:(p['pinned'],p['created_at'] or '',p['platform'],p['post_id']),reverse=True):
-        if p['publication_blocked'] or p['editorial_status']!='approved' or p['candidate_status']!='candidate': continue
+    posts=items(conn)
+    for p in sorted(posts,key=lambda p:(p['pinned'],p['created_at'] or '',p['platform'],p['post_id']),reverse=True):
+        if p['original_content_unavailable'] or p['publication_blocked'] or p['editorial_status']!='approved' or p['candidate_status']!='candidate': continue
         if p['group'] and p['group'] in seen: continue
         if p['group']: seen.add(p['group'])
+        if p['group']:
+            p['metadata']['repost_sources']=[dict(account_id=q['account_id'],name=q['metadata'].get('source_account_name'),post_id=q['post_id'],post_url=q['post_url']) for q in posts if q['group']==p['group'] and q['metadata'].get('is_repost')]
         result.append(p)
     return result
 

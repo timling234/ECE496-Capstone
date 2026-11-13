@@ -54,20 +54,25 @@ def feed_body(posts,settings,esc,safe_url):
         md=p.get('metadata',{});raw=p.get('raw',{})
         native=(raw.get('post') or {}).get('author') or {}
         label=md.get('source_label') or native.get('displayName') or p['account_id'] or 'Announcement'
-        attribution=md.get('attribution') or {}
+        is_repost=bool(md.get('is_repost'))
+        attribution=(md.get('attribution') or {}) if is_repost else {}
+        publisher_label=label+' reposted' if is_repost else label
+        publisher_date=md.get('reposted_at') or p['created_at'] if is_repost else p['created_at']
         original=safe_url(p['post_url'])
-        body='<article class="news-card" data-platform="'+esc(p['platform'])+'" data-post-id="'+esc(p['post_id'])+'"><div class="news-publisher">'+avatar(md.get('source_avatar') or native.get('avatar'))+'<div class="news-identity"><span class="news-name" title="'+esc(label)+'">'+esc(label)+'</span><time class="news-date">'+esc(date(p['created_at']))+'</time></div>'+('<span class="news-platform">'+platform_icon(p['platform'])+'</span>' if settings['show_origin'] else '')+'</div><section class="news-post">'
+        body='<article class="news-card" data-platform="'+esc(p['platform'])+'" data-post-id="'+esc(p['post_id'])+'"><div class="news-publisher">'+avatar(md.get('source_avatar') or native.get('avatar'))+'<div class="news-identity"><span class="news-name" title="'+esc(publisher_label)+'">'+esc(publisher_label)+'</span><time class="news-date">'+esc(date(publisher_date))+'</time></div>'+('<span class="news-platform">'+platform_icon(p['platform'])+'</span>' if settings['show_origin'] else '')+'</div><section class="news-post">'
         for media in p['media'][:1]:
             url=safe_url(media.get('fullsize') or media.get('url') or media.get('preview_image_url'))
             if url:body+='<a class="news-media" href="'+esc(original or url)+'" target="_blank" rel="noopener noreferrer"><img loading="lazy" referrerpolicy="no-referrer" src="'+esc(url)+'" alt="'+esc(media.get('alt','Post image'))+'"></a>'
         body+='<div class="news-inner">'
         if attribution.get('name'):
-            body+='<div class="news-author" title="Original author, copied with permission">'+avatar(attribution.get('avatar'))+'<div class="news-identity"><span class="news-name">'+esc(attribution['name'])+'</span><time class="news-date">'+esc(date(attribution.get('date') or p['created_at']))+'</time></div></div>'
+            body+='<div class="news-author" title="Original author of this repost">'+avatar(attribution.get('avatar'))+'<div class="news-identity"><span class="news-name">'+esc(attribution['name'])+'</span><time class="news-date">'+esc(date(attribution.get('date') or p['created_at']))+'</time></div></div>'
         chunks=re.split(r'((?<![\w])#[\w]+)',p['text'])
         text=''.join('<span class="news-tag">'+esc(chunk)+'</span>' if re.fullmatch(r'#[\w]+',chunk) else esc(chunk) for chunk in chunks)
         body+='<p class="content">'+text+'</p><button type="button" data-read-more aria-expanded="false" hidden>Read more</button></div></section>'
         if original:
             body+='<footer class="news-actions"><a title="Like on original platform" aria-label="Like on original platform" href="'+esc(original)+'" target="_blank" rel="noopener noreferrer">'+icon('heart')+'</a><a title="Read comments on original platform" aria-label="Read comments on original platform" href="'+esc(original)+'" target="_blank" rel="noopener noreferrer">'+icon('comment')+'</a><button type="button" class="news-share" data-share="'+esc(original)+'">'+icon('share')+'<span>Share</span></button></footer>'
+        others=sorted({source['name'] for source in md.get('repost_sources',[]) if source.get('name') and source['name']!=md.get('source_account_name')})
+        if others:body+='<p class="news-other-sources">Also reposted by '+esc(', '.join(others))+'</p>'
         cards.append(body+'</article>')
     pages=['<div class="news-page">'+''.join(cards[i:i+4])+'</div>' for i in range(0,len(cards),4)]
     return FEED_STYLE+'<section class="news-carousel" aria-label="Published news"><div class="news-pages">'+(''.join(pages) or '<p>No published updates yet.</p>')+'</div><button type="button" class="news-arrow news-prev" aria-label="Previous page" hidden>'+icon('prev')+'</button><button type="button" class="news-arrow news-next" aria-label="Next page" hidden>'+icon('next')+'</button><nav class="news-dots" aria-label="News pages"></nav><span class="news-sr" data-page-status aria-live="polite"></span></section><script src="/assets/feed.js?v=carousel-2" defer></script>'

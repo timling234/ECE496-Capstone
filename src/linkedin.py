@@ -35,6 +35,7 @@ def transport(url, token=None, data=None, version='202610'):
         raise ValueError('Invalid LinkedIn destination')
     headers = {'Accept': 'application/json', 'X-Restli-Protocol-Version': '2.0.0',
                'LinkedIn-Version': version}
+    if 'ids=List(' in url:headers['X-RestLi-Method']='BATCH_GET'
     if token:
         headers['Authorization'] = 'Bearer ' + token
     if data is not None:
@@ -120,6 +121,23 @@ class Credentials:
         value['refresh_expires_at'] = self.clock() + int(payload.get('refresh_token_expires_in', 0))
         self.save(connection, value)
         return connection
+
+    def organization(self,connection,account,request=transport):
+        """Resolve the selected organization once per grant, never from display guesses."""
+        grant=self.read(connection)
+        cached=grant.get('organizations',{}).get(account)
+        if cached:return cached
+        data=request('https://api.linkedin.com/rest/organizations/'+account,token=self.access_token(connection))
+        if str(data.get('id'))!=account:raise ValueError('Organization identity mismatch')
+        name=data.get('localizedName')
+        if not name:
+            names=(data.get('name') or {}).get('localized',{})
+            name=next(iter(names.values()),None)
+        if not isinstance(name,str) or not name.strip():raise ValueError('Organization name unavailable')
+        profile=dict(id='urn:li:organization:'+account,name=name)
+        with LOCK:
+            grant=self.read(connection);grant.setdefault('organizations',{})[account]=profile;self.save(connection,grant)
+        return profile
 
     def access_token(self, connection):
         # One refresh at most, shared across sources connected with this grant.
@@ -247,7 +265,7 @@ def posting_connections(config,credentials):
     return sorted(result,key=lambda row:row['authenticated_at'],reverse=True)
 
 
-def connect_pages(runtime,choice,account=None):
+def connect_pages(runtime,choice,account=None,credentials=None):
     """Bind a validated Page grant immediately; preserve retrieval preferences."""
     from .source_config import find_source
     from .source_connections import remember
@@ -260,6 +278,11 @@ def connect_pages(runtime,choice,account=None):
         accounts=([account] if account is not None else [s['account'] for s in config['sources'] if s.get('platform')=='linkedin' and s.get('account') in choice['pages']])
         if not accounts and len(choice['pages'])==1:accounts=list(choice['pages'])
         for selected in accounts:
+            if credentials and (choice['pages'][selected].startswith('LinkedIn Page ') or choice['pages'][selected]=='LinkedIn organization'):
+                try:choice['pages'][selected]=credentials.organization(choice['connection'],selected)['name']
+                except HTTPError as error:
+                    if error.code not in (403,404):raise
+                    choice['pages'][selected]='LinkedIn organization'
             source=find_source(config,'linkedin:'+selected) or find_source(config,'linkedin:')
             if source is None:
                 source=dict(platform='linkedin');config['sources'].append(source)
@@ -279,7 +302,7 @@ def connect_pages(runtime,choice,account=None):
         return accounts
 
 
-def normalize(post, account, label=None, image_assets=None):
+def normalize(post, account, label=None, image_assets=None, original=None, original_resolution="unverified"):
     identity = post['id']
     if not re.fullmatch(r'urn:li:(?:share|ugcPost):\d+', identity):
         raise ValueError('Invalid LinkedIn post identifier')
@@ -299,10 +322,35 @@ def normalize(post, account, label=None, image_assets=None):
         url=asset.get('downloadUrl','')
         if isinstance(url,str) and urlparse(url).scheme=='https':
             media.append(dict(url=url,alt=item.get('altText') or 'LinkedIn post image',asset_id=item['id']))
-    return dict(platform='linkedin', account_id=account, post_id=identity,
-                created_at=created, text=plain_text(post.get('commentary', '')),
-                post_url='https://www.linkedin.com/feed/update/' + quote(identity, safe=':' ) + '/',
-                links=links, media=media, metadata={'content': content, 'lastModifiedAt': post.get('lastModifiedAt'), 'source_label': label or 'LinkedIn Page '+account}, raw=post)
+    from .linkedin_reposts import original_id
+    root=original_id(post);is_repost=bool(root)
+    publisher=label if label and not label.startswith('LinkedIn Page ') else 'LinkedIn organization'
+    author_id=post.get('author');author_name=publisher;original_date=created
+    source_avatar=None
+    metadata=dict(content=content,lastModifiedAt=post.get('lastModifiedAt'),source_label=publisher,source_account_name=publisher,source_account_id='urn:li:organization:'+account,is_repost=is_repost,attribution={})
+    if is_repost:
+        metadata.update(original_post_url='https://www.linkedin.com/feed/update/'+root+'/',original_post_id=root,parent_post_id=(post.get('reshareContext') or {}).get('parent'),reposted_at=created,reposted_by=dict(id=post.get('author'),name=publisher),repost_commentary=plain_text(post.get('commentary','')),original_resolution='available' if original else original_resolution)
+        if original:
+            resolved=normalize(original,account,label,image_assets)
+            expanded=original.get('author~') or {}
+            if not isinstance(expanded,dict):expanded={}
+            author_id=original.get('author')
+            author_name=expanded.get('localizedName') or expanded.get('name')
+            if not isinstance(author_name,str):author_name=None
+            if not author_name:
+                first=expanded.get('localizedFirstName') or '';last=expanded.get('localizedLastName') or ''
+                author_name=(first+' '+last).strip() or None
+            source_avatar=expanded.get('profilePictureUrl') or expanded.get('avatar')
+            original_date=resolved['created_at']
+            metadata.update(original_post=original,original_published_at=original_date,attribution=dict(name=author_name or 'Original author unavailable',id=author_id,date=original_date,avatar=source_avatar))
+            text=resolved['text'];media=resolved['media'];links=resolved['links'];created=original_date
+        else:
+            author_id=None;author_name=None;text=plain_text(post.get('commentary',''))
+            metadata['original_published_at']=None
+    else:text=plain_text(post.get('commentary',''))
+    metadata.update(author_id=author_id,author_name=author_name,author_avatar=source_avatar)
+    return dict(platform='linkedin',account_id=account,post_id=identity,created_at=created,text=text,post_url='https://www.linkedin.com/feed/update/'+quote(identity,safe=':')+'/',links=links,media=media,metadata=metadata,raw=post)
+
 
 
 class LinkedInProvider:
@@ -335,32 +383,11 @@ class LinkedInProvider:
             raise
         if not isinstance(data.get('elements'), list):
             raise ValueError('LinkedIn returned an invalid post list')
-        # Resolve all referenced images in one bounded batch, never one call per photo.
-        image_ids=set()
-        for item in data['elements']:
-            if item.get('author') != 'urn:li:organization:' + self.account:
-                raise ValueError('LinkedIn returned a different organization')
-            if item.get('lifecycleState')!='PUBLISHED':continue
-            content=item.get('content') or {}
-            media=(content.get('multiImage') or {}).get('images',[]) or ([content['media']] if content.get('media') else [])
-            article=content.get('article') or {}
-            if article.get('thumbnail'):media=media+[{'id':article['thumbnail']}]
-            for image in media:
-                urn=image.get('id','')
-                if isinstance(urn,str) and re.fullmatch(r'urn:li:image:[A-Za-z0-9_-]+',urn):image_ids.add(urn)
-        assets={}
-        if image_ids and len(image_ids)<=100:
-            ids='List('+','.join(quote(urn,safe='') for urn in sorted(image_ids))+')'
-            try:assets=self.request('https://api.linkedin.com/rest/images?ids='+ids,token=token).get('results',{})
-            except HTTPError as error:
-                # Some read-only grants cannot resolve image resources; retain post text.
-                if error.code not in (403,404):raise
-        posts = []
-        for item in data['elements']:
-            if item.get('author') != 'urn:li:organization:' + self.account:
-                raise ValueError('LinkedIn returned a different organization')
-            if item.get('lifecycleState') == 'PUBLISHED':
-                posts.append(normalize(item, self.account, self.label, assets))
+        elements=data['elements']
+        for item in elements:
+            if item.get('author')!='urn:li:organization:'+self.account:raise ValueError('LinkedIn returned a different organization')
+        from .linkedin_reposts import hydrate
+        posts=hydrate(self,[p for p in elements if p.get('lifecycleState')=='PUBLISHED'],token)
         # One recent window and at most one media batch. No pagination or retries.
         newest = max((p['raw'].get('lastModifiedAt', 0) for p in posts), default=0)
         return FetchBatch(posts, str(newest) if newest else checkpoint)
