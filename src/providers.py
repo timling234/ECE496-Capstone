@@ -31,6 +31,7 @@ class Provider(ABC):
 
 
 class XProvider(Provider):
+    supports_post_lookup=True
     platform = "x"
 
     def __init__(self, account, token_file=X_TOKEN, page_size=5, transport=fetch_json, token_getter=None):
@@ -50,7 +51,7 @@ class XProvider(Provider):
         if not token:
             raise ValueError("X token file is empty")
         params = {"max_results": self.page_size,
-                  "tweet.fields": "created_at,attachments,entities",
+                  "tweet.fields": "created_at,attachments,entities,edit_history_tweet_ids",
                   "expansions": "attachments.media_keys",
                   "media.fields": "type,url,preview_image_url,width,height"}
         if checkpoint:
@@ -70,12 +71,13 @@ class XProvider(Provider):
                 raise ValueError("Repeated X pagination token")
             visited.add(following)
             params["pagination_token"] = following
-        ids = [p["post_id"] for p in posts] + ([checkpoint] if checkpoint else [])
+        ids = [p["raw"]["id"] for p in posts] + ([checkpoint] if checkpoint else [])
         newest = max(ids, key=int) if ids else checkpoint
         return FetchBatch(posts, newest)
 
 
 class BlueskyProvider(Provider):
+    supports_post_lookup=True
     platform = "bluesky"
 
     def __init__(self, account, page_size=5, transport=fetch_json):

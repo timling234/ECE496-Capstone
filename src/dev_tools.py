@@ -28,7 +28,8 @@ TESTS={
  'operations':('Operations / Dev Tools','FR-1/7/10','test_operations.py'),
  'entrypoints':('Verification Entry Points','FR-10','test_verification_entrypoints.py'),
 }
-LIVE={'live-bluesky':('Bluesky Fetch','Live API request'),
+LIVE={'local-ai-judgment':('Local AI Judgment','Six local text cases; original MSRG captions + ordinary posts + obvious mistakes. No social API calls.'),
+      'live-bluesky':('Bluesky Fetch','Live API request'),
       'live-x':('X Fetch','Live API request; may use API credits'),
       'publish-bluesky':('Publish Bluesky Test Post','Creates a real public test post'),
       'e2e-bluesky':('Bluesky Candidate E2E','Publishes a real test post; fetches and verifies pending candidacy')}
@@ -142,6 +143,11 @@ class DevTools:
                 result=subprocess.run(command,cwd=ROOT,env=env,shell=False,capture_output=True,text=True,encoding='utf-8',errors='replace',timeout=self.timeout)
                 output=result.stdout+result.stderr
                 if result.returncode:status='FAIL'
+            elif test_id=='local-ai-judgment':
+                from .ai_benchmark import run
+                with closing(sqlite3.connect(self.db)) as conn:report=run(conn)
+                output=json.dumps(report,ensure_ascii=False,indent=2)
+                if report['passed']!=report['total']:status='FAIL'
             elif test_id.startswith('live-'):
                 output=json.dumps(self.runtime.fetch_now(test_id.removeprefix('live-')))
                 if json.loads(output)['status']!='ok':status='FAIL'

@@ -253,6 +253,7 @@ def normalize(post, account, label=None, image_assets=None):
 
 
 class LinkedInProvider:
+    supports_post_lookup=True
     platform = 'linkedin'
 
     def __init__(self, account, connection, credentials, page_size=100, request=transport, label=None):

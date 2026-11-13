@@ -60,7 +60,7 @@ def fetch_bluesky(limit):
 def normalize_x(post, media, account_id=X_USER_ID):
     keys = post.get("attachments", {}).get("media_keys", [])
     return {
-        "platform": "x", "account_id": account_id, "post_id": post["id"],
+        "platform": "x", "account_id": account_id, "post_id": (post.get("edit_history_tweet_ids") or [post["id"]])[0],
         "created_at": post.get("created_at"), "text": post.get("text", ""),
         "post_url": f"https://x.com/i/web/status/{post['id']}",
         "links": [u.get("expanded_url") or u.get("url") for u in post.get("entities", {}).get("urls", [])],
@@ -140,7 +140,10 @@ def load_posts(conn):
 
 # FR-3/FR-4/FR-5: Re-evaluate derived stages from saved common records
 def process_stored(conn):
-    candidates = mark_candidates(conn, load_posts(conn), rules=())
+    from .source_sync import initialize
+    initialize(conn)
+    unavailable={(a,b) for a,b in conn.execute('SELECT c.platform,c.post_id FROM source_post_checks c WHERE c.unavailable=1 AND c.checked_at=(SELECT MAX(n.checked_at) FROM source_post_checks n WHERE n.platform=c.platform AND n.post_id=c.post_id)')}
+    candidates = mark_candidates(conn, load_posts(conn), rules=(lambda p:(p['platform'],p['post_id']) not in unavailable,))
     groups = mark_duplicate_candidates(conn, candidates)
     return candidates, groups
 

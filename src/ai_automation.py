@@ -78,7 +78,7 @@ class AutomationReviewer(Reviewer):
             initialize(conn);posts=items(conn)
             selected=next((p for p in posts if (p['platform'],p['post_id'])==target),None) if target else None
             if target and not selected:raise ValueError('Post not found in this workspace')
-            seeds=[selected] if target else [p for p in posts if p['editorial_status'] in ('pending','needs review')]
+            seeds=[selected] if target else [p for p in posts if p['editorial_status'] in ('pending','needs review') and not p.get('source_unavailable')]
             if not seeds:raise ValueError('No pending posts to review.')
             units=[];seen=set();count=0
             for seed in seeds:
@@ -143,7 +143,7 @@ class AutomationReviewer(Reviewer):
                 fresh=group_keys==keys and len(current)==len(unit) and snapshot(conn,current)==signature
                 running=conn.execute('SELECT status FROM ai_batches WHERE id=?',(batch,)).fetchone()[0]=='running'
                 enabled=settings(conn,self.model.model)==cfg and running
-                pending=[i for i,p in enumerate(current) if p['editorial_status'] in ('pending','needs review')]
+                pending=[i for i,p in enumerate(current) if p['editorial_status'] in ('pending','needs review') and not p.get('source_unavailable')]
                 why='Suggestion only';actions=[]
                 if not fresh:why='Skipped: content, group or editorial decision changed'
                 elif mode=='automatic':

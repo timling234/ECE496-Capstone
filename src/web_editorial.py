@@ -23,25 +23,29 @@ def initialize(conn):
 
 
 def fingerprint(post):
-    return hashlib.sha256(json.dumps({k:post[k] for k in
-        ('text','created_at','post_url','links','media')},sort_keys=True).encode()).hexdigest()
+    data={k:post[k] for k in ('text','created_at','post_url','links','media')}
+    data['media']=[{'asset_id':m['asset_id']} if m.get('asset_id') else m for m in post['media']]
+    if post['platform']=='linkedin':data['source_content']=post.get('raw',{}).get('content')
+    return hashlib.sha256(json.dumps(data,sort_keys=True).encode()).hexdigest()
 
 
 def items(conn):
     posts=load_posts(conn)
+    unavailable={(a,b) for a,b in conn.execute('SELECT c.platform,c.post_id FROM source_post_checks c WHERE c.unavailable=1 AND c.checked_at=(SELECT MAX(n.checked_at) FROM source_post_checks n WHERE n.platform=c.platform AND n.post_id=c.post_id)')} if table_exists(conn,'source_post_checks') else set()
     relevance={(a,b):s for a,b,s in conn.execute('SELECT * FROM relevance')}
     groups={(a,b):g for a,b,g in conn.execute('SELECT * FROM duplicate_candidates')}
     decisions={(r[0],r[1]):r for r in conn.execute('SELECT * FROM editorial_decisions')}
     ordering={(a,b):(p,n) for a,b,p,n in conn.execute('SELECT * FROM feed_order')}
     reasons={(a,b):r for a,b,r in conn.execute('SELECT * FROM editorial_reasons')} if table_exists(conn,'editorial_reasons') else {}
     for p in posts:
+        p['source_unavailable']=(p['platform'],p['post_id']) in unavailable
         p['pinned'],p['position']=ordering.get((p['platform'],p['post_id']),(0,0))
         key=(p['platform'],p['post_id']); d=decisions.get(key)
         p['editorial_reason']=reasons.get(key)
         p['candidate_status']=relevance.get(key,'ingested')
         p['group']=groups.get(key)
         p['editorial_status']=d[2] if d else 'pending'
-        if d and d[2]=='approved' and d[3]!=fingerprint(p):
+        if d and d[2]=='approved' and d[3] not in (fingerprint(p),hashlib.sha256(json.dumps({k:p[k] for k in ('text','created_at','post_url','links','media')},sort_keys=True).encode()).hexdigest()):
             p['editorial_status']='needs review'
         # Earlier service approvals remain visible; provenance fields are not approval authority.
         if not d and table_exists(conn,'group_approvals') and p['group']:
@@ -169,7 +173,7 @@ def bulk_action(conn, keys, action, actor='admin'):
                 if p['group']:groups.add(p['group'])
             else:
                 for table in ('editorial_decisions','editorial_reasons','feed_order','group_approvals',
-                              'ai_suggestions','notification_seen','notification_outbox','relevance','duplicate_candidates'):
+                              'ai_suggestions','source_post_checks','notification_seen','notification_outbox','relevance','duplicate_candidates'):
                     if table_exists(conn,table):conn.execute('DELETE FROM '+table+' WHERE platform=? AND post_id=?',(platform,post_id))
                 if platform=='manual':conn.execute('DELETE FROM manual_versions WHERE post_id=?',(post_id,))
                 conn.execute('DELETE FROM posts WHERE platform=? AND post_id=?',(platform,post_id))

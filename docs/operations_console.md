@@ -81,3 +81,31 @@ Bluesky boundaries reset across the workspace platform because handles and DIDs
 may differ. A subsequent explicit fetch can re-ingest deleted posts as pending
 if they are still available within that source's configured recent fetch window.
 Deletion never removes the original post from its social platform.
+
+Local AI judgment: Testing / Development → Run local AI judgment test runs six
+explicit local-model calls with the workspace model/policy. Expected decisions,
+actual decisions, reasons and false rejections appear in the task result. The
+fixtures include two authorized original MSRG captions, an ordinary announcement,
+a short-link update and two obvious test/mistake submissions. This is a text-only
+benchmark, not an image/video comprehension test or a claim of general accuracy.
+It publishes nothing and does not modify the review queue. Uncustomized legacy
+policies now prefer approval for ordinary news; saved custom policies stay intact.
+
+Source lifecycle synchronization: each successful fetch updates returned content
+and may make ONE additional batch lookup for stored posts absent from the recent
+window (up to 100 LinkedIn/X IDs or 25 Bluesky URIs). Oldest-unchecked posts rotate
+first. Fetch results and source rows expose updated/unavailable/unchecked counts.
+A timeline omission alone never removes a post. Individual LinkedIn 404/410 or
+non-published lifecycle states, X resource-not-found errors, or omission from a
+successful Bluesky hydrated lookup mark originals unavailable, not provably
+physically deleted. Permissions/rate limits/network/invalid responses leave the
+existing visibility unchanged and report unchecked verification. Edits to approved
+content require re-review; unavailable originals leave the public feed and require
+review if they return. This runs on Fetch/polling, not instantly; polling remains
+under user control. No extra pagination, automatic retry or publishing is added.
+X edit-history IDs use their first ID as the stable local identity; the original
+link points to the returned version. LinkedIn media asset identity/content are used
+for change detection so expiring image URLs alone do not revoke an approval.
+References: https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/posts-api
+https://docs.x.com/x-api/posts/lookup/introduction
+https://github.com/bluesky-social/atproto/blob/main/lexicons/app/bsky/feed/getPosts.json

@@ -5,7 +5,7 @@ import sqlite3
 import threading
 import time
 import requests
-from .review_ai import POLICY,LocalModel
+from .review_ai import POLICY,LEGACY_POLICY,LocalModel
 
 CATALOG={'gemma4:e2b-it-qat':'Gemma 4 E2B · lightweight', 'qwen3:4b':'Qwen 3 4B · compact','qwen3:8b':'Qwen 3 8B · balanced'}
 
@@ -18,7 +18,9 @@ def initialize(conn):
 def settings(conn,default_model=''):
     initialize(conn)
     row=conn.execute('SELECT model,policy,auto_approve,auto_reject,batch_limit FROM ai_settings WHERE id=1').fetchone()
-    return dict(zip(('model','policy','auto_approve','auto_reject','batch_limit'),row or (default_model,POLICY,1,1,20)))
+    result=dict(zip(('model','policy','auto_approve','auto_reject','batch_limit'),row or (default_model,POLICY,1,1,20)))
+    if result['policy']==LEGACY_POLICY:result['policy']=POLICY
+    return result
 
 
 def save(conn,values,installed):

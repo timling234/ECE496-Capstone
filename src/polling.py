@@ -6,6 +6,7 @@ from email.utils import parsedate_to_datetime
 from urllib.error import HTTPError
 
 from .providers import Provider
+from .source_sync import reconcile
 from .store_poc import process_stored, store
 
 
@@ -50,7 +51,8 @@ def poll_due(conn, sources, now, force=False):
         )""")
     columns={row[1] for row in conn.execute("PRAGMA table_info(source_poll_state)")}
     for name, definition in (("fetched_count","INTEGER NOT NULL DEFAULT 0"),
-                             ("new_count","INTEGER NOT NULL DEFAULT 0"), ("error_code","INTEGER")):
+                             ("new_count","INTEGER NOT NULL DEFAULT 0"), ("error_code","INTEGER"),
+                             ("updated_count","INTEGER NOT NULL DEFAULT 0"),("unavailable_count","INTEGER NOT NULL DEFAULT 0"),("unchecked_count","INTEGER NOT NULL DEFAULT 0")):
         if name not in columns:
             with conn: conn.execute(f"ALTER TABLE source_poll_state ADD COLUMN {name} {definition}")
     outcomes = []
@@ -73,12 +75,14 @@ def poll_due(conn, sources, now, force=False):
             new_count=len({(p["platform"],p["post_id"]) for p in batch.posts
                 if not conn.execute("SELECT 1 FROM posts WHERE platform=? AND post_id=?",(p["platform"],p["post_id"])).fetchone()})
             with conn:
-                store(conn, batch.posts)
+                merged,sync=reconcile(conn,provider,batch,now)
+                store(conn, merged)
                 process_stored(conn)
                 conn.execute("""UPDATE source_poll_state SET checkpoint=?,
                     last_attempt_at=?,last_success_at=?,error_type=NULL,next_poll_at=?,fetched_count=?,new_count=?,error_code=NULL WHERE source_key=?""",
                              (batch.checkpoint, now, now, now + source.interval_seconds, len(batch.posts), new_count, provider.key))
-            outcomes.append({"source": provider.key, "status": "ok", "fetched": len(batch.posts), "new": new_count})
+                conn.execute('UPDATE source_poll_state SET updated_count=?,unavailable_count=?,unchecked_count=? WHERE source_key=?',(sync['updated'],sync['unavailable'],sync['unchecked'],provider.key))
+            outcomes.append({"source": provider.key, "status": "ok", "fetched": len(batch.posts), "new": new_count,**sync})
         except Exception as error:
             retry_at = now + source.interval_seconds
             if isinstance(error, HTTPError) and error.code == 429:
@@ -99,7 +103,7 @@ def poll_due(conn, sources, now, force=False):
                 if not math.isfinite(retry_at):
                     retry_at = now + source.interval_seconds
             with conn:
-                conn.execute("UPDATE source_poll_state SET last_attempt_at=?,error_type=?,next_poll_at=?,error_code=?,fetched_count=0,new_count=0 WHERE source_key=?",
+                conn.execute("UPDATE source_poll_state SET last_attempt_at=?,error_type=?,next_poll_at=?,error_code=?,fetched_count=0,new_count=0,updated_count=0,unavailable_count=0,unchecked_count=0 WHERE source_key=?",
                              (now, type(error).__name__, retry_at, getattr(error,"code",None), provider.key))
             outcomes.append({"source": provider.key, "status": "error", "error_type": type(error).__name__})
     return outcomes

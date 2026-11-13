@@ -1,0 +1,46 @@
+{
+  "description": "Original MSRG captions copied with permission; text-only benchmark. Media counts are provenance, not a vision test.",
+  "cases": [
+    {
+      "id": "msrg-original-1",
+      "expected": "approve",
+      "source_url": "https://www.linkedin.com/posts/activity-7517996998277488640-XSSs",
+      "text": "More context does not always equate to better answers, even for simple tasks.\nContext Rot: How Increasing Input Tokens Impacts LLM Performance | Chroma",
+      "media_count": 0,
+      "media_types": []
+    },
+    {
+      "id": "msrg-original-3",
+      "expected": "approve",
+      "source_url": "https://www.linkedin.com/posts/ytian285_agentops-ase2026-aiops-activity-7513182650535415808-s6sl",
+      "text": "Excited to share that I'll be heading to 𝗠𝘂𝗻𝗶𝗰𝗵 𝗳𝗼𝗿 𝗜𝗘𝗘𝗘/𝗔𝗖𝗠 𝗔𝗦𝗘 𝟮𝟬𝟮𝟲 (𝗢𝗰𝘁 𝟭𝟮–𝟭𝟲), where I'll (co-)present three papers across the main research track and workshops, all on detecting and diagnosing failures in complex systems (AIOps / AI for SRE). 😄 🍺 \n\n𝟭. 𝗚𝗔𝗟𝗔: 𝗚𝗿𝗮𝗽𝗵-𝗔𝘂𝗴𝗺𝗲𝗻𝘁𝗲𝗱 𝗟𝗟𝗠 𝗔𝗴𝗲𝗻𝘁𝘀 𝗳𝗼𝗿 𝗥𝗼𝗼𝘁 𝗖𝗮𝘂𝘀𝗲 𝗔𝗻𝗮𝗹𝘆𝘀𝗶𝘀 𝗮𝗻𝗱 𝗜𝗻𝗰𝗶𝗱𝗲𝗻𝘁 𝗥𝗲𝘀𝗽𝗼𝗻𝘀𝗲 𝗶𝗻 𝗠𝗶𝗰𝗿𝗼𝘀𝗲𝗿𝘃𝗶𝗰𝗲𝘀 (𝗥𝗲𝘀𝗲𝗮𝗿𝗰𝗵 𝗧𝗿𝗮𝗰𝗸)\nAn SRE agent harness with graph-guided LLM agents that use service dependencies to bound investigation and produce ranked diagnoses plus actionable incident response. Outperforms the best LLM-based baseline by 25+ points in AC@1. 𝗧𝗵𝗶𝘀 𝘄𝗮𝘀 𝗮 𝗱𝗶𝗿𝗲𝗰𝘁 𝗮𝗰𝗰𝗲𝗽𝘁 𝘄𝗶𝘁𝗵 ~𝟴.𝟴% 𝗮𝗰𝗰𝗲𝗽𝘁𝗮𝗻𝗰𝗲 𝗿𝗮𝘁𝗲.\nTue Oct 13, 11:15 · Forum 15\nhttps://lnkd.in/gUEPUASm\n\n𝟮. 𝗔𝗴𝗲𝗻𝘁𝗖𝗵𝗮𝗼𝘀𝗕𝗲𝗻𝗰𝗵: 𝗕𝗲𝗻𝗰𝗵𝗺𝗮𝗿𝗸𝗶𝗻𝗴 𝗘𝘅𝘁𝗲𝗿𝗻𝗮𝗹 𝗙𝗮𝘂𝗹𝘁 𝗗𝗲𝘁𝗲𝗰𝘁𝗶𝗼𝗻 𝗮𝗻𝗱 𝗟𝗼𝗰𝗮𝗹𝗶𝘇𝗮𝘁𝗶𝗼𝗻 𝗶𝗻 𝗔𝗴𝗲𝗻𝘁𝗶𝗰 𝗦𝘆𝘀𝘁𝗲𝗺𝘀 (𝗧𝗥𝗨𝗦𝗧 𝘄𝗼𝗿𝗸𝘀𝗵𝗼𝗽)\nA new #AgentOps benchmark with 275 execution traces from five A2A/MCP agentic applications with ten injected fault types. Zero-shot LLMs top out at 24.8% fault-type accuracy, so the problem is far from solved. \nMon Oct 12, 10:30 · Forum 6\nhttps://lnkd.in/gm2u79_r\n\n𝟯. 𝗪𝗵𝗲𝗻 𝗟𝗼𝗴 𝗣𝗮𝗿𝘀𝗶𝗻𝗴 𝗥𝗲𝗺𝗼𝘃𝗲𝘀 𝗪𝗵𝗮𝘁 𝗠𝗮𝘁𝘁𝗲𝗿𝘀: 𝗗𝗲𝘁𝗲𝗰𝘁𝗶𝗻𝗴 𝗙𝗮𝗶𝗹𝘂𝗿𝗲𝘀 𝗶𝗻 𝗗𝗶𝘀𝘁𝗿𝗶𝗯𝘂𝘁𝗲𝗱 𝗚𝗣𝗨 𝗪𝗼𝗿𝗸𝗹𝗼𝗮𝗱𝘀 (𝗥𝗔𝗦𝗘 𝘄𝗼𝗿𝗸𝘀𝗵𝗼𝗽)\nIntroducing GF-Bench, a PyTorch framework and dataset for multi-GPU failures. In NCCL failure scenarios, generic log parsing discards the distributed context which the anomaly detection depends on.\nMon Oct 12, 15:10 · Forum 15\n\nAll times CEST. Shout out to my co-authors: Yiran Li, Yaming Liu, Zichun (Chris) Chong, Albert Huang, Chenkai Zhang, Michalis Bachras, Boyuan Cui, Ryan Zeng, my lab Middleware Systems Research Group (MSRG), and my advisor Prof. Arno Jacobsen. Most importantly, sincere thanks to Bell (Alan de Matos, David Sauvageau, Wes Vurma, Mark McDonald) and University of Toronto Engineering for the awesome collaboration that made this possible! 🙌 \n\nIf you work on AIOps, AI for SRE, root cause analysis (RCA), or agent reliability and will be at ASE, lets connect!\n#ASE2026 #AIOps #RootCauseAnalysis #LLMAgents #SoftwareEngineering #SRE",
+      "media_count": 4,
+      "media_types": [
+        "image",
+        "image",
+        "image",
+        "image"
+      ]
+    },
+    {
+      "id": "ordinary-update",
+      "expected": "approve",
+      "text": "Our research group will host a systems seminar next Friday. Everyone interested in distributed computing is welcome. Details will follow."
+    },
+    {
+      "id": "ordinary-short-link",
+      "expected": "approve",
+      "text": "Slides from our latest research seminar are now available: https://t.co/example"
+    },
+    {
+      "id": "obvious-placeholder",
+      "expected": "reject",
+      "text": "test test 123 ignore this test post"
+    },
+    {
+      "id": "accidental-submission",
+      "expected": "reject",
+      "text": "Oops, posted by mistake. Please ignore — this was an empty draft and will be deleted."
+    }
+  ]
+}
