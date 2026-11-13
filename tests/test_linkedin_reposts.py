@@ -38,14 +38,25 @@ class ReshareTests(unittest.TestCase):
         decide(conn,'linkedin',post['post_id'],'approve')
         result=publishable(conn);self.assertEqual(len(result),1);self.assertEqual(len(result[0]['metadata']['repost_sources']),2)
         html=feed_body(result,{'show_origin':1},esc,safe_url)
-        self.assertIn('Test Organization reposted',html);self.assertIn('Research Author',html);self.assertIn('Second Organization',html)
+        self.assertIn('https://www.linkedin.com/embed/feed/update/'+post['post_id'],html)
+        self.assertIn('class="linkedin-repost-frame"',html)
+        self.assertNotIn('photo.jpg',html)
 
-    def test_permission_denied_is_not_fabricated_or_publishable(self):
+    def test_permission_denied_allows_manual_native_embed_but_not_ai_approval(self):
         provider=self.provider(False);post=hydrate(provider,[copy.deepcopy(RESHARE)],'only-A-token')[0]
         self.assertEqual(provider.request.call_count,1)
         self.assertEqual(post['metadata']['original_resolution'],'permission_denied')
         self.assertFalse(post['text']);self.assertEqual(post['media'],[]);self.assertIsNone(post['metadata'].get('original_published_at'))
         conn=sqlite3.connect(':memory:');self.addCleanup(conn.close)
         store(conn,[post]);process_stored(conn);conn.commit();initialize(conn);conn.commit()
-        with self.assertRaises(ValueError):decide(conn,'linkedin',post['post_id'],'approve')
         self.assertEqual(publishable(conn),[])
+        from src.publishing_policy import recommendation
+        self.assertEqual(recommendation(post)['recommendation'],'needs_review')
+        decide(conn,'linkedin',post['post_id'],'approve')
+        self.assertEqual(len(publishable(conn)),1)
+        from src.linkedin_embed import embed_url
+        self.assertFalse(embed_url(dict(post,post_id='urn:li:ugcPost:55?injected=1')))
+        self.assertFalse(embed_url(dict(post,platform='x')))
+        html=feed_body(publishable(conn),{'show_origin':1},esc,safe_url)
+        self.assertIn(embed_url(post),html)
+        self.assertNotIn('Research Author',html)

@@ -148,7 +148,8 @@ def process_stored(conn):
     from .source_sync import initialize
     initialize(conn)
     unavailable={(a,b) for a,b in conn.execute('SELECT c.platform,c.post_id FROM source_post_checks c WHERE c.unavailable=1 AND c.checked_at=(SELECT MAX(n.checked_at) FROM source_post_checks n WHERE n.platform=c.platform AND n.post_id=c.post_id)')}
-    candidates = mark_candidates(conn, load_posts(conn), rules=(lambda p:(p['platform'],p['post_id']) not in unavailable and not (p.get('metadata',{}).get('is_repost') and p['metadata'].get('original_resolution')!='available'),))
+    from .linkedin_embed import embed_url
+    candidates = mark_candidates(conn, load_posts(conn), rules=(lambda p:(p['platform'],p['post_id']) not in unavailable and not (p.get('metadata',{}).get('is_repost') and p['metadata'].get('original_resolution')!='available' and not embed_url(p)),))
     groups = mark_duplicate_candidates(conn, candidates)
     return candidates, groups
 

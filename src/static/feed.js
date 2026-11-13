@@ -45,6 +45,7 @@
   function measure() {
     root.querySelectorAll('.news-page:not([hidden]) .news-card').forEach(card => {
       const text = card.querySelector('.content'), button = card.querySelector('[data-read-more]');
+      if (!text || !button) return;
       button.hidden = button.getAttribute('aria-expanded') !== 'true' && text.scrollHeight <= text.clientHeight + 1;
     });
     announceHeight();

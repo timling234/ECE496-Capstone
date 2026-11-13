@@ -45,7 +45,12 @@ def card(p,csrf=None,show_origin=True,return_view="pending"):
         body+='<label class="post-select" hidden><input type="checkbox" name="post" form="post-bulk" value="'+esc(json.dumps([p['platform'],p['post_id']],separators=(',',':')))+'" aria-label="Select post"></label>'
         body+='<form class="post-delete" method="post" action="/posts-action"><input type="hidden" name="csrf" value="'+esc(csrf)+'"><input type="hidden" name="return_view" value="'+esc(return_view)+'"><input type="hidden" name="post" value="'+esc(json.dumps([p['platform'],p['post_id']],separators=(',',':')))+'"><input type="hidden" name="action" value="delete"><button title="Delete post" aria-label="Delete post">&#10006;</button></form>'
     if p.get('source_unavailable'):body+='<p class="bad">Original post is deleted or unavailable. Hidden from the public feed.</p>'
-    if p.get('metadata',{}).get('is_repost') and p['metadata'].get('original_resolution')!='available':body+='<p class="notice">Repost found. LinkedIn did not provide the original content ('+esc(p['metadata'].get('original_resolution','unverified'))+'). Open the original on LinkedIn; this item requires human review.</p><p><a href="'+esc(safe_url(p['metadata'].get('original_post_url','')))+'" target="_blank" rel="noopener noreferrer">View original on LinkedIn ↗</a></p>'
+    from .linkedin_embed import embed_frame
+    frame=embed_frame(p,esc)
+    if frame:
+        body+=frame
+        if p['metadata'].get('original_resolution')!='available':
+            body+='<p><small>Review the LinkedIn preview before approving. AI cannot inspect the original content returned only inside this embed.</small></p>'
     body+='<p class="content">'+esc(p['text'])+'</p>'
     url=safe_url(p['post_url'])
     if url: body+='<a target="_blank" rel="noopener noreferrer" href="'+esc(url)+'">Original post</a>'
@@ -120,7 +125,7 @@ def make_handler(db,password,host='127.0.0.1',port=5000,runtime=None,dev_enabled
             self.send_header('Cache-Control','no-store')
             self.send_header('X-Content-Type-Options','nosniff')
             self.send_header('Referrer-Policy','no-referrer')
-            self.send_header('Content-Security-Policy',"default-src 'none'; style-src 'unsafe-inline'; img-src https: http:; form-action 'self' https://www.linkedin.com; base-uri 'none'; frame-src 'self'")
+            self.send_header('Content-Security-Policy',"default-src 'none'; style-src 'unsafe-inline'; img-src https: http:; form-action 'self' https://www.linkedin.com; base-uri 'none'; frame-src 'self' https://www.linkedin.com")
             if urlparse(self.path).path!='/feed':self.send_header('X-Frame-Options','DENY')
             if cookie: self.send_header('Set-Cookie',cookie)
             self.end_headers(); self.wfile.write(body)

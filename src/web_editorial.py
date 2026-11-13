@@ -4,6 +4,7 @@ import json
 from datetime import datetime, timezone
 from .store_poc import load_posts
 from .editorial import table_exists
+from .linkedin_embed import embed_url
 
 
 def initialize(conn):
@@ -69,7 +70,7 @@ def decide(conn, platform, post_id, action, actor='admin', *, transaction=True):
     try:
         posts=items(conn); p=next((p for p in posts if (p['platform'],p['post_id'])==(platform,post_id)),None)
         if p is None: raise ValueError('Post not found')
-        if action=='approve' and p['original_content_unavailable']:raise ValueError('LinkedIn did not provide the original repost content; it cannot be published as a complete news item')
+        if action=='approve' and p['original_content_unavailable'] and not embed_url(p):raise ValueError('LinkedIn did not provide the original repost content; it cannot be published as a complete news item')
         if action=='approve' and p['publication_blocked']:raise ValueError('Placeholder or explicitly test-only content cannot be published')
         if action=='approve' and p['candidate_status']!='candidate': raise ValueError('Only candidates can be approved')
         now=datetime.now(timezone.utc).isoformat()
@@ -100,7 +101,7 @@ def publishable(conn):
     result=[]; seen=set()
     posts=items(conn)
     for p in sorted(posts,key=lambda p:(p['pinned'],p['created_at'] or '',p['platform'],p['post_id']),reverse=True):
-        if p['original_content_unavailable'] or p['publication_blocked'] or p['editorial_status']!='approved' or p['candidate_status']!='candidate': continue
+        if (p['original_content_unavailable'] and not embed_url(p)) or p['publication_blocked'] or p['editorial_status']!='approved' or p['candidate_status']!='candidate': continue
         if p['group'] and p['group'] in seen: continue
         if p['group']: seen.add(p['group'])
         if p['group']:

@@ -110,7 +110,7 @@ def create_app(db, password, runtime=None, *, start_workers=False, google=None, 
         response.headers['Cache-Control'] = 'public, max-age=86400' if request.endpoint=='static' else 'no-store'
         response.headers['X-Content-Type-Options'] = 'nosniff'
         response.headers['Referrer-Policy'] = 'no-referrer'
-        response.headers.setdefault('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; img-src https: http:; form-action 'self' https://www.linkedin.com https://x.com https://bsky.social; base-uri 'none'; frame-src 'self'; script-src 'self'; connect-src 'self'")
+        response.headers.setdefault('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; img-src https: http:; form-action 'self' https://www.linkedin.com https://x.com https://bsky.social; base-uri 'none'; frame-src 'self' https://www.linkedin.com; script-src 'self'; connect-src 'self'")
         if not request.path.endswith('/feed'):
             response.headers['X-Frame-Options'] = 'SAMEORIGIN' if request.path.endswith('/embed-demo') or request.path=='/demo-feed' else 'DENY'
         if secure:
