@@ -109,6 +109,35 @@
     if (event.target.closest('[data-feed-controls]')) updateFeed();
     else if (event.target.closest('.mock-controls')) updateMock();
   });
+  let duplicateDrag;
+  function finishDuplicateDrag(cancel=false) {
+    if(!duplicateDrag)return;
+    const {row,list,original,wasDirty,pointerId}=duplicateDrag;duplicateDrag=null;
+    row.classList.remove('dragging');
+    if(list.hasPointerCapture(pointerId))list.releasePointerCapture(pointerId);
+    const changed=[...list.children].some((item,index)=>item!==original[index]);
+    if(cancel){list.replaceChildren(...original);dirty=wasDirty;return;}
+    if(changed){
+      const form=list.closest('form');form.elements.namedItem('platform_order').value=[...list.children].map(item=>item.dataset.duplicatePlatform).join(',');form.requestSubmit();
+    }else dirty=wasDirty;
+  }
+  document.addEventListener('pointerdown',event=>{
+    const row=event.target.closest('[data-duplicate-platform]');
+    if(!row || event.target.closest('button') || event.button!==0 || posting || duplicateDrag)return;
+    const list=row.parentElement;
+    duplicateDrag={row,list,original:[...list.children],wasDirty:dirty,pointerId:event.pointerId,startY:event.clientY};
+    dirty=true;list.setPointerCapture(event.pointerId);event.preventDefault();
+  });
+  document.addEventListener('pointermove',event=>{
+    const drag=duplicateDrag;if(!drag || drag.pointerId!==event.pointerId || Math.abs(event.clientY-drag.startY)<5)return;
+    drag.row.classList.add('dragging');
+    const before=[...drag.list.children].find(item=>item!==drag.row && event.clientY<item.getBoundingClientRect().top+item.getBoundingClientRect().height/2);
+    drag.list.insertBefore(drag.row,before || null);
+  });
+  document.addEventListener('pointerup',event=>{if(duplicateDrag?.pointerId===event.pointerId)finishDuplicateDrag();});
+  document.addEventListener('pointercancel',event=>{if(duplicateDrag?.pointerId===event.pointerId)finishDuplicateDrag(true);});
+  document.addEventListener('lostpointercapture',event=>{if(duplicateDrag?.pointerId===event.pointerId)finishDuplicateDrag(true);});
+  document.addEventListener('keydown',event=>{if(event.key==='Escape' && duplicateDrag)finishDuplicateDrag(true);});
   document.addEventListener('click', async event => {
     const move=event.target.closest('[data-duplicate-move]');
     if(move){
