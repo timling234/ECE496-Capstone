@@ -29,20 +29,24 @@ def theme_css(style,accent,settings=None):
     css=(PRECISION_BASE+PRECISION_LAYOUT).replace('news-theme-precision','news-theme-'+style) if base=='precision' else ''
     css+=palette(style,accent,'dark' if style.endswith('_dark') else 'auto')
     scope='.news-theme-'+style
-    for prefix,selectors in [('text',(' .content',' [data-read-more]')),('title',(' .news-name',' .content h1',' .content h2',' .content h3'))]:
+    for prefix,selectors in [('text',(' .content',)),('title',(' .news-name',' .content h1',' .content h2',' .content h3'))]:
         rules=[]
         color=settings.get(prefix+'_color','')
         if re.fullmatch(r'#[0-9a-fA-F]{6}',color):rules.append('color:'+color)
         font=FONTS.get(settings.get(prefix+'_font','default'))
         if font:rules.append('font-family:'+font)
+        if prefix=='title':rules.append('font-size:'+str(settings.get('title_size',13))+'px')
         if rules:css+=','.join(scope+selector for selector in selectors)+'{'+(';'.join(rules))+'}'
+    link_font=FONTS.get(settings.get('link_font','default')) or (FONTS['system'] if base=='precision' else 'Arial,system-ui,sans-serif')
+    rules='font-family:'+link_font+';font-size:'+str(settings.get('link_size',settings.get('font_size',16)))+'px'
+    css+=','.join(scope+selector for selector in (' .news-body-link',' .news-tag',' [data-read-more]',' .news-share'))+'{'+rules+'}'
     return '<style>'+css+'</style>'
 
 
 PRECISION_BASE='.news-theme-precision{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.news-theme-precision .news-page{gap:20px}.news-theme-precision .news-card{background:white;border:1px solid #d8e2ed!important;border-top:3px solid var(--theme-link)!important;border-radius:4px!important;padding:18px!important;box-shadow:0 3px 12px #152e4b08}.news-theme-precision .news-publisher{padding-bottom:13px;border-bottom:1px solid #e5ebf1}.news-theme-precision .news-name{color:#172c46;font-weight:650}.news-theme-precision .news-date{font:11px ui-monospace,SFMono-Regular,Consolas,monospace;color:#65788d;margin-top:5px}.news-theme-precision .news-post{background:#fafcfe;border:0;border-radius:0}.news-theme-precision .news-inner{padding:14px 0}.news-theme-precision .content{color:#283c52;line-height:1.5}.news-theme-precision .content.collapsed{max-height:4.5em}.news-theme-precision .news-actions{border-top:1px solid #e5ebf1;padding-top:14px;color:#5b6f85}.news-theme-precision .news-media{background:#eaf0f6}.news-theme-precision .news-dots button[aria-current=page]{background:var(--theme-link)}.news-theme-precision .news-arrow{background:#274766e8}.news-theme-precision .news-stream-list .news-card{border-top:0!important;border-bottom:8px solid #eaf0f6!important;border-radius:0!important}'
 
 PRECISION_PICKER='''<style>
-.mini-precision{flex-direction:column;gap:6px}.mini-precision .theme-mini-card{position:relative;flex:none;display:block;width:100%;height:28px;box-sizing:border-box;padding:5px 8px 3px 45px;border:1px solid #dbe2eb;border-left:2px solid #2963a3;border-radius:3px}.mini-precision.mini-dark .theme-mini-card{background:#1c2b3d;border-color:#314358}.mini-precision .theme-mini-heading{position:absolute;left:5px;top:6px;width:29px;height:3px}.mini-precision .theme-mini-image{display:none}.mini-precision .theme-mini-line{height:2px;margin-bottom:3px}.mini-precision .theme-mini-link{height:2px;margin-top:3px;width:25%}@media(max-width:600px){.theme-options{grid-template-columns:repeat(2,minmax(0,1fr))}}.feed-type-grid{display:grid;grid-template-columns:90px repeat(2,minmax(140px,240px));gap:12px;align-items:center;margin:20px 0}.feed-type-grid label{font-size:13px}.feed-type-grid select{display:block;width:100%;padding:6px;margin-top:4px}.feed-type-grid input[type=color]{display:block;width:52px;height:30px;padding:2px;margin-top:4px}.feed-icon-toggle{display:block;margin:18px 0 8px}.feed-type-grid button{justify-self:start}@media(max-width:650px){.feed-type-grid{grid-template-columns:1fr 1fr}.feed-type-grid>b{grid-column:1/-1}}
+.mini-precision{flex-direction:column;gap:6px}.mini-precision .theme-mini-card{position:relative;flex:none;display:block;width:100%;height:28px;box-sizing:border-box;padding:5px 8px 3px 45px;border:1px solid #dbe2eb;border-left:2px solid #2963a3;border-radius:3px}.mini-precision.mini-dark .theme-mini-card{background:#1c2b3d;border-color:#314358}.mini-precision .theme-mini-heading{position:absolute;left:5px;top:6px;width:29px;height:3px}.mini-precision .theme-mini-image{display:none}.mini-precision .theme-mini-line{height:2px;margin-bottom:3px}.mini-precision .theme-mini-link{height:2px;margin-top:3px;width:25%}@media(max-width:600px){.theme-options{grid-template-columns:repeat(2,minmax(0,1fr))}}.feed-type-grid{display:grid;grid-template-columns:90px minmax(90px,140px) minmax(140px,240px) 100px;gap:12px;align-items:center;margin:20px 0}.feed-type-grid label{font-size:13px}.feed-type-grid select{display:block;width:100%;padding:6px;margin-top:4px}.feed-type-grid input[type=number]{display:block;margin-top:4px;width:100%}.feed-type-grid input[type=color]{display:block;width:52px;height:30px;padding:2px;margin-top:4px}.feed-icon-toggle{display:block;margin:18px 0 8px}.feed-type-grid button{justify-self:start}@media(max-width:650px){.feed-type-grid{grid-template-columns:1fr 1fr}.feed-type-grid>b{grid-column:1/-1}}
 
 </style>'''
 
@@ -92,9 +96,13 @@ def typography_controls(settings):
     from html import escape
     dark=settings.get('style','classic').endswith('_dark')
     body=['<div class="feed-type-grid">']
-    for prefix,label in [('text','Body'),('title','Title')]:
+    for prefix,label,size_name,default_size in [('title','Title','title_size',13),('text','Body','font_size',16),('link','Link','link_size',16)]:
         default=('#edf3fc' if dark else '#151515') if prefix=='title' else ('#dee7f2' if dark else '#222222')
         color=settings.get(prefix+'_color') or default
+        color_name=prefix+'_color'
+        marker='<input type="hidden" name="'+prefix+'_color_custom" value="'+('1' if settings.get(prefix+'_color') else '0')+'">'
+        custom=' data-custom-color="'+prefix+'"'
+        if prefix=='link':color=settings['accent'];color_name='accent';marker=custom=''
         choices=''.join('<option value="'+key+'" '+('selected' if settings.get(prefix+'_font','default')==key else '')+'>'+name+'</option>' for key,name in [('default','Style default'),('system','System'),('arial','Arial'),('georgia','Georgia'),('times','Times New Roman'),('mono','Monospace')])
-        body.append('<b>'+label+'</b><label>Text color<input type="color" name="'+prefix+'_color" value="'+escape(color,quote=True)+'" data-custom-color="'+prefix+'"><input type="hidden" name="'+prefix+'_color_custom" value="'+('1' if settings.get(prefix+'_color') else '0')+'"></label><label>Text font<select name="'+prefix+'_font">'+choices+'</select></label>')
-    return ''.join(body)+'</div><button type="button" data-reset-text-colors>Reset text colors</button>'
+        body.append('<b>'+label+'</b><label>Text color<input aria-label="'+label+' text color" type="color" name="'+color_name+'" value="'+escape(color,quote=True)+'"'+custom+'>'+marker+'</label><label>Text font<select aria-label="'+label+' text font" name="'+prefix+'_font">'+choices+'</select></label><label>Font size<input aria-label="'+label+' font size" type="number" name="'+size_name+'" value="'+str(settings.get(size_name,default_size))+'" min="12" max="24"></label>')
+    return ''.join(body)+'</div><button type="button" data-reset-text-colors>Reset typography</button>'

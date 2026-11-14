@@ -29,6 +29,10 @@ def initialize(conn):
     with conn:
         for name,default in [('text_color',''),('title_color',''),('text_font','default'),('title_font','default')]:
             if name not in columns:conn.execute("ALTER TABLE feed_settings ADD COLUMN "+name+" TEXT NOT NULL DEFAULT '"+default+"'")
+        for name,definition in [('link_font',"TEXT NOT NULL DEFAULT 'default'"),('title_size','INTEGER NOT NULL DEFAULT 13'),('link_size','INTEGER NOT NULL DEFAULT 16')]:
+            if name not in columns:
+                conn.execute('ALTER TABLE feed_settings ADD COLUMN '+name+' '+definition)
+                if name=='link_size':conn.execute('UPDATE feed_settings SET link_size=font_size')
         conn.execute("UPDATE feed_settings SET style=CASE WHEN style='slate' THEN CASE WHEN color_theme='light' THEN 'classic' ELSE 'classic_dark' END WHEN color_theme='dark' AND style IN ('classic','precision') THEN style||'_dark' ELSE style END,color_theme='auto' WHERE style='slate' OR color_theme!='auto'")
 
 
@@ -176,11 +180,11 @@ def edit_announcement(conn, post_id, text, actor='admin'):
 
 # FR-9: Presentation settings cannot change eligibility or provenance.
 def presentation(conn):
-    row=conn.execute('SELECT accent,font_size,show_origin,style,color_theme,text_color,title_color,text_font,title_font FROM feed_settings WHERE id=1').fetchone()
-    return dict(zip(('accent','font_size','show_origin','style','color_theme','text_color','title_color','text_font','title_font'),row or ('#215e95',16,1,'classic','auto','','','default','default')))
+    row=conn.execute('SELECT accent,font_size,show_origin,style,color_theme,text_color,title_color,text_font,title_font,link_font,title_size,link_size FROM feed_settings WHERE id=1').fetchone()
+    return dict(zip(('accent','font_size','show_origin','style','color_theme','text_color','title_color','text_font','title_font','link_font','title_size','link_size'),row or ('#215e95',16,1,'classic','auto','','','default','default','default',13,16)))
 
 
-def save_presentation(conn, accent, font_size, show_origin, style=None, *, text_color=None,title_color=None,text_font=None,title_font=None):
+def save_presentation(conn, accent, font_size, show_origin, style=None, *, text_color=None,title_color=None,text_font=None,title_font=None,link_font=None,title_size=None,link_size=None):
     import re
     from .feed_themes import THEMES,FONTS
     current=presentation(conn)
@@ -190,12 +194,16 @@ def save_presentation(conn, accent, font_size, show_origin, style=None, *, text_
     style=current['style'] if style is None else style
     if style not in THEMES:raise ValueError('Choose an available feed style')
     values={}
-    for name,value in [('text_color',text_color),('title_color',title_color),('text_font',text_font),('title_font',title_font)]:
+    for name,value in [('text_color',text_color),('title_color',title_color),('text_font',text_font),('title_font',title_font),('link_font',link_font)]:
         value=current[name] if value is None else value
         if name.endswith('_color') and value and not re.fullmatch(r'#[0-9a-fA-F]{6}',value):raise ValueError('Choose a valid text color')
         if name.endswith('_font') and value not in FONTS:raise ValueError('Choose an available font')
         values[name]=value
-    with conn:conn.execute("INSERT OR REPLACE INTO feed_settings (id,accent,font_size,show_origin,style,color_theme,text_color,title_color,text_font,title_font) VALUES (1,?,?,?,?,'auto',?,?,?,?)",(accent,font_size,int(bool(show_origin)),style,*values.values()))
+    for name,value in [('title_size',title_size),('link_size',link_size)]:
+        value=current[name] if value is None else int(value)
+        if not 12<=value<=24:raise ValueError('Font size must be 12–24')
+        values[name]=value
+    with conn:conn.execute("INSERT OR REPLACE INTO feed_settings (id,accent,font_size,show_origin,style,color_theme,text_color,title_color,text_font,title_font,link_font,title_size,link_size) VALUES (1,?,?,?,?,'auto',?,?,?,?,?,?,?)",(accent,font_size,int(bool(show_origin)),style,*values.values()))
 
 
 def bulk_action(conn, keys, action, actor='admin'):

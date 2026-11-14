@@ -113,6 +113,8 @@
     if (event.target.matches('[data-reset-text-colors]')) {
       const form=event.target.closest('form');
       form.querySelectorAll('input[name$="_color_custom"]').forEach(input => input.value='0');
+      form.querySelectorAll('select[name$="_font"]').forEach(input => input.value='default');
+      for (const [name,value] of Object.entries({accent:'#215e95',font_size:16,title_size:13,link_size:16})) form.elements.namedItem(name).value=value;
       form.requestSubmit();return;
     }
     const multi = event.target.closest('[data-multi-select]');
