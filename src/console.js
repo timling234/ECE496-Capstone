@@ -24,6 +24,13 @@
     const value = new URL(url); value.searchParams.delete('notice'); value.searchParams.delete('error');
     return value;
   }
+  function focusNotification() {
+    const query=new URL(location.href).searchParams;
+    const selectors=query.has('reauth_source') ? ['[data-source-key]','sourceKey',query.get('reauth_source')] : query.has('focus_group') ? ['[data-group]','group',query.get('focus_group')] : ['article[data-post-id]','postId',query.get('focus_post')];
+    if (!selectors[2]) return;
+    const node=[...document.querySelectorAll(selectors[0])].find(node => node.dataset[selectors[1]]===selectors[2] && (!query.has('focus_platform') || node.dataset.platform===query.get('focus_platform')));
+    if (node) { node.style.outline='2px solid #80bded'; node.scrollIntoView({block:'center'}); }
+  }
   function replace(doc) {
     const fresh = doc.querySelector('main');
     if (!fresh || !main()) return false;
@@ -179,5 +186,5 @@
       buttons.forEach(button => button.disabled = false); posting = false; schedule();
     }
   });
-  notices(document); history.replaceState(null, '', clean(location.href)); schedule();
+  focusNotification(); notices(document); history.replaceState(null, '', clean(location.href)); schedule();
 })();

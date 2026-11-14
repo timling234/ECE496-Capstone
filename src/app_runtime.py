@@ -163,7 +163,10 @@ class AppRuntime:
             row=dict(source);row.update(states.get(key,{}))
             row['label']=profiles.get((platform,source.get('authorized_account') or source.get('account'))) or profiles.get((platform,source.get('account'))) or row.get('label')
             row['authentication']=authentication(row,self.config_path.parent)
-            row['status']=('Not connected' if platform=='linkedin' and not source.get('connection_id') else 'Reconnect LinkedIn' if platform=='linkedin' and (row.get('error_code')==401 or row.get('error_type')=='ReconnectRequired') else 'Fetching' if self.active==key
+            if row['authentication']=='Authenticated' and platform in ('x','linkedin') and (row.get('error_type')=='ReconnectRequired' or row.get('error_code')==401):
+                # A newer successful authorization supersedes this old fetch error.
+                row.update(error_type=None,error_code=None)
+            row['status']=('Reconnect required' if row['authentication']=='Reconnect required' else 'Not connected' if platform=='linkedin' and not source.get('connection_id') else 'Reconnect LinkedIn' if platform=='linkedin' and (row.get('error_code')==401 or row.get('error_type')=='ReconnectRequired') else 'Fetching' if self.active==key
                 else 'Queued' if key in self.pending else 'Error' if row.get('error_type')
                 else 'Disabled' if not source.get('enabled') else 'Healthy' if row.get('last_success_at') is not None else 'Waiting')
             rows.append(row)

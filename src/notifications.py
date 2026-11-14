@@ -4,7 +4,6 @@ import re
 import smtplib
 import ssl
 import time
-from email.message import EmailMessage
 
 
 EVENTS={'ai_review':('AI needs human review','The AI flagged a post for human review. Open Review Queue.'),
@@ -88,18 +87,15 @@ def smtp_ready():
     return bool(os.environ.get('ASAP_SMTP_HOST') and os.environ.get('ASAP_SMTP_FROM'))
 
 
-def send_email(recipient, platform, post_id, event="new_post"):
+def send_email(recipient, platform, post_id, event="new_post", *, details=None):
     """Credentials from environment only. TLS is mandatory for remote SMTP."""
     host = os.environ['ASAP_SMTP_HOST']
     mode = os.environ.get('ASAP_SMTP_SECURITY','starttls')
     if mode not in ('starttls','ssl'):
         raise ValueError('SMTP security must be starttls or ssl')
     port = int(os.environ.get('ASAP_SMTP_PORT','465' if mode=='ssl' else '587'))
-    message = EmailMessage()
-    message['From'] = os.environ['ASAP_SMTP_FROM']
-    message['To'] = recipient
-    message['Subject'] = 'ASAP: '+EVENTS[event][0]
-    message.set_content(EVENTS[event][1]+'\nSource: '+platform+'\nItem: '+post_id)
+    from .notification_mail import message as build_message
+    message=build_message(recipient,platform,post_id,event,details)
     cls = smtplib.SMTP_SSL if mode=='ssl' else smtplib.SMTP
     kwargs = dict(timeout=15)
     if mode=='ssl': kwargs['context']=ssl.create_default_context()
@@ -120,6 +116,7 @@ def deliver_pending(conn, sender=None, now=None):
     config = settings(conn)
     conn.commit()
     if not config['enabled'] or (sender is None and not smtp_ready()): return 0
+    custom_sender=sender
     sender = sender or send_email
     rows = conn.execute("SELECT id,platform,post_id,recipient,attempts,event FROM notification_outbox WHERE state='pending' AND next_attempt<=? ORDER BY CASE event WHEN 'ai_review' THEN 0 WHEN 'reauth' THEN 1 WHEN 'duplicates' THEN 2 ELSE 3 END,id LIMIT 10", (now,)).fetchall()
     sent = 0
@@ -128,7 +125,14 @@ def deliver_pending(conn, sender=None, now=None):
             with conn:conn.execute("UPDATE notification_outbox SET state='cancelled' WHERE id=?",(key,))
             continue
         try:
-            if event=='new_post':sender(recipient,platform,post_id)
+            if custom_sender is None:
+                from .notification_mail import context
+                details=context(conn,event,platform,post_id)
+                if details.get('resolved'):
+                    with conn:conn.execute("UPDATE notification_outbox SET state='cancelled' WHERE id=?",(key,))
+                    continue
+                sender(recipient,platform,post_id,event=event,details=details)
+            elif event=='new_post':sender(recipient,platform,post_id)
             else:sender(recipient,platform,post_id,event=event)
         except Exception as error:
             with conn:
