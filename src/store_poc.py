@@ -151,6 +151,8 @@ def process_stored(conn):
     from .linkedin_embed import embed_url
     candidates = mark_candidates(conn, load_posts(conn), rules=(lambda p:not (p.get('metadata',{}).get('is_repost') and p['metadata'].get('original_resolution')!='available' and not embed_url(p)),))
     groups = mark_duplicate_candidates(conn, candidates)
+    from .duplicate_policy import reconcile
+    reconcile(conn)
     return candidates, groups
 
 

@@ -1,7 +1,24 @@
 """Duplicate candidates only; no merging, ranking or publication decisions."""
 
 import hashlib
+import re
+from urllib.parse import urlsplit,urlunsplit
 from collections import defaultdict
+
+
+def comparison_text(post):
+    def canonical(url):
+        try:
+            p=urlsplit(url)
+            return urlunsplit(('',p.netloc.lower().removeprefix('www.'),'' if p.path=='/' else p.path,p.query,p.fragment)).removeprefix('//')
+        except ValueError:return url
+    text=post['text']
+    entities=post.get('metadata',{}).get('entities',{}).get('urls',[])
+    for entity in entities:
+        short=entity.get('url');expanded=entity.get('expanded_url') or entity.get('unwound_url')
+        if short and expanded:text=text.replace(short,expanded)
+    text=re.sub(r'https?://[^\s<>]+',lambda match:canonical(match.group()),text)
+    return ' '.join(text.split())
 
 
 # FR-5: Duplicate control (reversible initial exact-match strategy)
@@ -14,7 +31,7 @@ def exact_text_groups(posts):
     """
     posts=list(posts);buckets=defaultdict(set);texts={}
     for post in posts:
-        identity=(post['platform'],post['post_id']);text=' '.join(post['text'].split());texts[identity]=text
+        identity=(post['platform'],post['post_id']);text=comparison_text(post);texts[identity]=text
         if text:buckets[('text',text)].add(identity)
         if post['platform']=='linkedin':
             md=post.get('metadata',{})
@@ -60,5 +77,7 @@ def mark_duplicate_candidates(conn, candidates, strategy=exact_text_groups):
                      [(platform, post_id, group_id) for group_id, members in groups.items()
                       for platform, post_id in members])
     from .notifications import queue_event
-    for group in groups:queue_event(conn,'duplicates',group,platform='duplicates',post_id=group)
+    for group,members in groups.items():
+        version=hashlib.sha256(repr(members).encode()).hexdigest()
+        queue_event(conn,'duplicates',group,version,platform='duplicates',post_id=group)
     return groups

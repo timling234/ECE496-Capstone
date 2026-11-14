@@ -8,7 +8,7 @@ from .dev_tools import TESTS, LIVE, credentials
 STYLE="""
 [hidden]{display:none!important}.post-delete{position:absolute;right:10px;top:7px;margin:0}.post-delete button{background:transparent;color:#c62828;font-size:20px;width:32px;height:32px;padding:0}.post-delete button:hover{background:#fce8e8}article:has(.post-delete)>.post-status{margin-right:38px}.post-select{display:block;margin-bottom:8px}.post-bulk-toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.post-bulk-toolbar label{margin-right:12px}
 
-.ai-suggestion{background:#f1f6fb;border-left:3px solid #7397c4;padding:10px;margin:12px 0}
+.duplicate-priority li{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border:1px solid #d8e0e8;border-radius:6px;margin:6px 0}.duplicate-priority button{margin-left:5px}.ai-suggestion{background:#f1f6fb;border-left:3px solid #7397c4;padding:10px;margin:12px 0}
 
 .provider-picker{display:flex;gap:12px;margin:16px 0}.source-actions{text-align:right;vertical-align:middle}.source-actions form,.source-delete form{vertical-align:middle;margin:3px}.source-actions button,.source-delete button{height:32px;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center}.source-delete{width:36px;vertical-align:middle;text-align:right}.source-delete button{width:32px;background:transparent;color:#c62828;font-size:20px;padding:0;line-height:1}.source-delete button:hover{background:#fce8e8}.source-delete button:focus-visible{outline:2px solid #c62828;outline-offset:2px}.provider-option{color:#205a8b;font-size:14px;display:flex;align-items:center;gap:9px;padding:12px 18px;border:1px solid #ccd5df;border-radius:6px;text-decoration:none;background:#f8fafc}.provider-option.selected{background:#e4eef8;border:2px solid #2e63a5;padding:11px 17px}.source-editor>form{display:block}.source-editor select{max-width:100%}
 
@@ -133,6 +133,8 @@ def render_console(posts,history,settings,config,session,view,esc,card,runtime=N
                 body+='<details '+('open' if run==runs[0] else '')+'><summary>'+badge(run['status'])+' '+esc(run['test_id'])+' · '+esc(stamp(run['started_at']))+' · %.2fs'%run['duration']+'</summary><pre>'+esc(run['output'] or 'Task running…')+'</pre>'+link+'</details>'
             body+='</section>'
     elif view=='settings':
+        from .duplicate_policy import controls
+        body+=controls(settings.get('duplicates',{'mode':'human','order':['linkedin','bluesky','x']}),csrf,esc)
         if ai_panel:
             ai=ai_panel;cfg=ai['config']
             body+='<section class="panel source-editor"><h2>Local AI</h2><p>Models run on Server. Model files are shared; your selected model and review rules apply only to your workspace.</p>'

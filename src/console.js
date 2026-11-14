@@ -110,6 +110,13 @@
     else if (event.target.closest('.mock-controls')) updateMock();
   });
   document.addEventListener('click', async event => {
+    const move=event.target.closest('[data-duplicate-move]');
+    if(move){
+      const row=move.closest('[data-duplicate-platform]'),list=row.parentElement,step=Number(move.dataset.duplicateMove);
+      const sibling=step<0?row.previousElementSibling:row.nextElementSibling;if(!sibling)return;
+      if(step<0)list.insertBefore(row,sibling);else list.insertBefore(sibling,row);
+      const form=row.closest('form');form.elements.namedItem('platform_order').value=[...list.children].map(item=>item.dataset.duplicatePlatform).join(',');form.requestSubmit();return;
+    }
     if (event.target.matches('[data-reset-text-colors]')) {
       const form=event.target.closest('form');
       form.querySelectorAll('input[name$="_color_custom"]').forEach(input => input.value='0');

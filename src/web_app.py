@@ -206,10 +206,13 @@ def make_handler(db,password,host='127.0.0.1',port=5000,runtime=None,dev_enabled
                 from .review_ai import attach
                 attach(conn,posts,enabled=getattr(self,'ai_ready',False),config=getattr(self,'ai_config',None))
                 settings=presentation(conn)
+                from .duplicate_policy import settings as duplicate_settings
+                duplicate_config=duplicate_settings(conn)
                 notification_config=notifications.settings(conn)
                 notification_state=notifications.summary(conn)
                 conn.commit()
                 history=conn.execute('SELECT action,platform,post_id,actor,acted_at FROM editorial_actions ORDER BY id DESC LIMIT 20').fetchall()
+            settings['duplicates']=duplicate_config
             body=render_console(posts,history,settings,self.read_config(),session,view,esc,card,self.runtime,self.devtools,
                 query.get('notice',[''])[0],query=query,linkedin_posting=posting_connections(self.read_config(),self.linkedin_oauth.credentials),ai_panel=getattr(self,'ai_panel',None),connection_choices=choices(self.read_config(),self.config_path.parent),notification_config=notification_config,notification_state=notification_state,feed_url=getattr(self,'feed_url',None))
             self.send(200,page('ASAP Admin',body,console=True))
@@ -339,6 +342,13 @@ def make_handler(db,password,host='127.0.0.1',port=5000,runtime=None,dev_enabled
                         temporary.write_text(json.dumps(config,indent=2),encoding='utf-8');temporary.replace(self.config_path)
                 except ValueError as exc:return self.send(400,page('Invalid source configuration',esc(exc)))
                 return self.redirect('/admin?view=sources')
+            if route=='/duplicate-settings':
+                from .duplicate_policy import save as save_duplicates
+                try:
+                    with closing(self.db_connection()) as conn:
+                        with conn:save_duplicates(conn,value('mode'),value('platform_order').split(','))
+                except ValueError as exc:return self.send(400,page('Invalid duplicate settings',esc(exc)))
+                return self.redirect('/admin?view=settings')
             if route=='/notifications':
                 try:
                     with closing(self.db_connection()) as conn:

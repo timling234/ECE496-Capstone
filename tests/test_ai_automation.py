@@ -28,7 +28,11 @@ class AutomationTests(unittest.TestCase):
         with closing(sqlite3.connect(self.db)) as conn:return create_announcement(conn,text,actor='alice')
 
     def configure(self,approve=True,reject=True):
-        with closing(sqlite3.connect(self.db)) as conn:save(conn,dict(model='fixture',policy=POLICY,auto_approve='on' if approve else '',auto_reject='on' if reject else '',batch_limit=20),{'fixture':0})
+        with closing(sqlite3.connect(self.db)) as conn:
+            # Existing group-engine cases explicitly opt into automatic duplicate handling.
+            from src.duplicate_policy import initialize as duplicate_init
+            duplicate_init(conn);conn.execute("INSERT OR REPLACE INTO duplicate_settings VALUES(1,'priority','[\"linkedin\",\"bluesky\",\"x\"]')")
+            save(conn,dict(model='fixture',policy=POLICY,auto_approve='on' if approve else '',auto_reject='on' if reject else '',batch_limit=20),{'fixture':0})
 
     def finish(self):
         self.assertTrue(self.reviewer.slot.acquire(timeout=3));self.reviewer.slot.release()
@@ -198,3 +202,14 @@ class AutomationTests(unittest.TestCase):
         with self.assertRaises(ValueError):self.reviewer.submit(self.db,'manual','unknown','alice')
         with self.assertRaises(ValueError):self.reviewer.run_batch(self.db,'alice','publish-everything')
         self.model.review.assert_not_called()
+
+    def test_human_duplicate_policy_blocks_automatic_decisions(self):
+        self.add();self.add();self.configure()
+        from src.duplicate_policy import save as duplicate_save
+        with closing(sqlite3.connect(self.db)) as conn:
+            with conn:duplicate_save(conn,'human',['linkedin','bluesky','x'])
+        self.reviewer.run_batch(self.db,'alice','automatic');self.finish()
+        with closing(sqlite3.connect(self.db)) as conn:
+            self.assertEqual(publishable(conn),[])
+            self.assertEqual({p['editorial_status'] for p in items(conn)},{'pending'})
+            self.assertEqual(conn.execute('SELECT count(*) FROM ai_automation_actions').fetchone()[0],0)

@@ -58,3 +58,29 @@ class DuplicateTests(unittest.TestCase):
     def test_strategy_is_replaceable(self):
         """Verifies FR-5: strategy boundary exists without adding a fuzzy policy."""
         self.assertEqual(mark_duplicate_candidates(self.conn, self.posts, strategy=lambda posts: {}), {})
+
+    def test_link_wrappers_policy_and_notification(self):
+        from src.web_editorial import initialize,items,publishable,fingerprint,decide
+        from src.store_poc import process_stored
+        from src.duplicate_policy import save
+        from src import notifications
+        c=sqlite3.connect(':memory:');self.addCleanup(c.close)
+        text='ASAP brings LinkedIn, Bluesky and X updates into one review workspace.'
+        x=normalize_x({'id':'linked','created_at':'2026-11-14T12:00:00Z','text':text+'\nhttps://t.co/abc\n#ResearchSoftware','entities':{'urls':[{'url':'https://t.co/abc','expanded_url':'https://asap.surf/'}]}},{})
+        b=copy.deepcopy(x);b.update(platform='bluesky',post_id='bsky',text=text+'\nasap.surf\n#ResearchSoftware',metadata={})
+        other=copy.deepcopy(b);other.update(post_id='different',text=text+'\nother.example\n#ResearchSoftware')
+        self.assertEqual(len(exact_text_groups([x,b,other])),1)
+        store(c,[x,b]);initialize(c)
+        for p in (x,b):c.execute('INSERT INTO editorial_decisions VALUES(?,?,?,?,?,?)',(p['platform'],p['post_id'],'approved',fingerprint(p),'ai:test','2026-11-14T12:00:00Z'))
+        c.commit();notifications.save_settings(c,True,'email','user@example.org',{'duplicates':True})
+        process_stored(c);c.commit()
+        self.assertEqual({p['editorial_status'] for p in items(c)},{'needs review'})
+        self.assertEqual(notifications.summary(c)['pending'],1)
+        process_stored(c);c.commit();self.assertEqual(notifications.summary(c)['pending'],1)
+        with c:save(c,'priority',['x','bluesky','linkedin'])
+        self.assertEqual([p['platform'] for p in publishable(c)],['x'])
+        self.assertEqual(next(p['editorial_status'] for p in items(c) if p['platform']=='bluesky'),'rejected')
+        with c:save(c,'priority',['bluesky','linkedin','x'])
+        self.assertEqual([p['platform'] for p in publishable(c)],['bluesky'])
+        decide(c,'x','linked','approve',actor='human')
+        process_stored(c);c.commit();self.assertEqual([p['platform'] for p in publishable(c)],['x'])

@@ -188,6 +188,10 @@ class AutomationReviewer(Reviewer):
                             rec=results[0]['recommendation']
                             if (rec=='approve' and cfg['auto_approve'] and current[0]['candidate_status']=='candidate') or (rec=='reject' and cfg['auto_reject']):actions=[(0,rec)]
                         if actions:why='Applied automatically'
+                if group:
+                    from .duplicate_policy import settings as duplicate_settings
+                    if duplicate_settings(conn)['mode']=='human':
+                        actions=[];why='Human review required for possible duplicates'
                 executed={i:action for i,action in actions}
                 if group and any(action=='approve' for _,action in actions):
                     executed.update({i:'reject' for i in pending if i not in executed})
