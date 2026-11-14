@@ -2,6 +2,7 @@
 (() => {
   const root = document.querySelector('.news-carousel');
   if (!root) return;
+  const vertical = root.classList.contains('news-theme-precision') || root.classList.contains('news-theme-precision_dark');
   const cards = [...root.querySelectorAll('.news-card')];
   const host = root.querySelector('.news-pages'), dots = root.querySelector('.news-dots');
   let page = 0, size = 0, pages = [];
@@ -18,6 +19,11 @@
     announceHeight();
   }
   function paginate() {
+    if (vertical) {
+      if (!pages.length) { const node=document.createElement('div');node.className='news-page';node.append(...cards);host.replaceChildren(node);pages=[node]; }
+      root.querySelector('.news-prev').hidden=root.querySelector('.news-next').hidden=true;dots.hidden=true;
+      root.querySelector('[data-page-status]').textContent=cards.length+' posts';return;
+    }
     const next = innerWidth <= 560 ? 1 : innerWidth <= 900 ? 2 : 4;
     if (next === size) return;
     const first = page * (size || next); size = next; pages = []; host.replaceChildren(); dots.replaceChildren();
@@ -116,7 +122,7 @@
   }
   root.querySelector('.news-prev').onclick = () => { show(page - 1); measure(); };
   root.querySelector('.news-next').onclick = () => { show(page + 1); measure(); };
-  root.addEventListener('keydown', event => { if (streamMode) return; if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') { event.preventDefault(); show(page + (event.key === 'ArrowRight' ? 1 : -1)); measure(); } });
+  root.addEventListener('keydown', event => { if (streamMode || vertical) return; if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') { event.preventDefault(); show(page + (event.key === 'ArrowRight' ? 1 : -1)); measure(); } });
   dots.addEventListener('click',measure);
   addEventListener('resize',() => { if (!streamMode) { paginate(); measure(); } });
   root.addEventListener('load',measure,true);

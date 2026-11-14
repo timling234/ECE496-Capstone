@@ -20,8 +20,6 @@ def appearance_overrides(query):
     if origin in ('0','1'):result['show_origin']=int(origin)
     style=query.get('style',[''])[0]
     if style in THEMES:result['style']=style
-    color_theme=query.get('color_theme',[''])[0]
-    if color_theme in ('auto','light','dark'):result['color_theme']=color_theme
     return result
 
 
@@ -123,7 +121,7 @@ def feed_body(posts,settings,esc,safe_url):
     pages=['<div class="news-page">'+''.join(cards[i:i+4])+'</div>' for i in range(0,len(cards),4)]
     style=settings.get('style','classic')
     if style not in THEMES:style='classic'
-    return FEED_STYLE+STREAM_STYLE+theme_css(style,settings.get('accent','#215e95'),settings.get('color_theme','auto'))+'<section class="news-carousel news-theme-'+style+'" aria-label="Published news"><div class="news-pages">'+(''.join(pages) or '<p>No published updates yet.</p>')+'</div><button type="button" class="news-arrow news-prev" aria-label="Previous page" hidden>'+icon('prev')+'</button><button type="button" class="news-arrow news-next" aria-label="Next page" hidden>'+icon('next')+'</button><nav class="news-dots" aria-label="News pages"></nav><span class="news-sr" data-page-status aria-live="polite"></span></section><script src="/assets/feed.js?v=themes-2" defer></script>'
+    return FEED_STYLE+STREAM_STYLE+theme_css(style,settings.get('accent','#215e95'),settings)+'<section class="news-carousel news-theme-'+style+'" aria-label="Published news"><div class="news-pages">'+(''.join(pages) or '<p>No published updates yet.</p>')+'</div><button type="button" class="news-arrow news-prev" aria-label="Previous page" hidden>'+icon('prev')+'</button><button type="button" class="news-arrow news-next" aria-label="Next page" hidden>'+icon('next')+'</button><nav class="news-dots" aria-label="News pages"></nav><span class="news-sr" data-page-status aria-live="polite"></span></section><script src="/assets/feed.js?v=themes-3" defer></script>'
 
 
 def mock_body(query=None):

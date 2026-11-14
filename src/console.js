@@ -110,6 +110,11 @@
     else if (event.target.closest('.mock-controls')) updateMock();
   });
   document.addEventListener('click', async event => {
+    if (event.target.matches('[data-reset-text-colors]')) {
+      const form=event.target.closest('form');
+      form.querySelectorAll('input[name$="_color_custom"]').forEach(input => input.value='0');
+      form.requestSubmit();return;
+    }
     const multi = event.target.closest('[data-multi-select]');
     if (multi) {
       const active = multi.getAttribute('aria-pressed') !== 'true';
@@ -146,6 +151,7 @@
   document.addEventListener('change', event => {
     if (event.target.matches('[data-auto-submit]') || event.target.form?.matches('[data-auto-save]')) {
       const form=event.target.form;
+      if (event.target.dataset.customColor) form.elements.namedItem(event.target.dataset.customColor+'_color_custom').value='1';
       if (event.target.type==='checkbox') form.dataset.autoCheckbox=event.target.name;
       form.requestSubmit();
     }

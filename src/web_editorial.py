@@ -25,6 +25,11 @@ def initialize(conn):
         with conn:conn.execute("ALTER TABLE feed_settings ADD COLUMN color_theme TEXT NOT NULL DEFAULT 'auto'")
     if "style" not in {row[1] for row in conn.execute("PRAGMA table_info(feed_settings)")}:
         with conn:conn.execute("ALTER TABLE feed_settings ADD COLUMN style TEXT NOT NULL DEFAULT 'classic'")
+    columns={row[1] for row in conn.execute('PRAGMA table_info(feed_settings)')}
+    with conn:
+        for name,default in [('text_color',''),('title_color',''),('text_font','default'),('title_font','default')]:
+            if name not in columns:conn.execute("ALTER TABLE feed_settings ADD COLUMN "+name+" TEXT NOT NULL DEFAULT '"+default+"'")
+        conn.execute("UPDATE feed_settings SET style=CASE WHEN style='slate' THEN CASE WHEN color_theme='light' THEN 'classic' ELSE 'classic_dark' END WHEN color_theme='dark' AND style IN ('classic','precision') THEN style||'_dark' ELSE style END,color_theme='auto' WHERE style='slate' OR color_theme!='auto'")
 
 
 def fingerprint(post):
@@ -171,21 +176,26 @@ def edit_announcement(conn, post_id, text, actor='admin'):
 
 # FR-9: Presentation settings cannot change eligibility or provenance.
 def presentation(conn):
-    row=conn.execute('SELECT accent,font_size,show_origin,style,color_theme FROM feed_settings WHERE id=1').fetchone()
-    return dict(zip(('accent','font_size','show_origin','style','color_theme'),row or ('#215e95',16,1,'classic','auto')))
+    row=conn.execute('SELECT accent,font_size,show_origin,style,color_theme,text_color,title_color,text_font,title_font FROM feed_settings WHERE id=1').fetchone()
+    return dict(zip(('accent','font_size','show_origin','style','color_theme','text_color','title_color','text_font','title_font'),row or ('#215e95',16,1,'classic','auto','','','default','default')))
 
 
-def save_presentation(conn, accent, font_size, show_origin, style=None, color_theme=None):
+def save_presentation(conn, accent, font_size, show_origin, style=None, *, text_color=None,title_color=None,text_font=None,title_font=None):
     import re
-    if not re.fullmatch(r'#[0-9a-fA-F]{6}',accent): raise ValueError('Choose a six-digit hex color')
+    from .feed_themes import THEMES,FONTS
+    current=presentation(conn)
+    if not re.fullmatch(r'#[0-9a-fA-F]{6}',accent):raise ValueError('Choose a six-digit hex color')
     font_size=int(font_size)
     if not 12<=font_size<=24:raise ValueError('Font size must be 12–24')
-    from .feed_themes import THEMES
-    style=presentation(conn)['style'] if style is None else style
+    style=current['style'] if style is None else style
     if style not in THEMES:raise ValueError('Choose an available feed style')
-    color_theme=presentation(conn)['color_theme'] if color_theme is None else color_theme
-    if color_theme not in ('auto','light','dark'):raise ValueError('Choose an available color theme')
-    with conn:conn.execute('INSERT OR REPLACE INTO feed_settings (id,accent,font_size,show_origin,style,color_theme) VALUES (1,?,?,?,?,?)',(accent,font_size,int(bool(show_origin)),style,color_theme))
+    values={}
+    for name,value in [('text_color',text_color),('title_color',title_color),('text_font',text_font),('title_font',title_font)]:
+        value=current[name] if value is None else value
+        if name.endswith('_color') and value and not re.fullmatch(r'#[0-9a-fA-F]{6}',value):raise ValueError('Choose a valid text color')
+        if name.endswith('_font') and value not in FONTS:raise ValueError('Choose an available font')
+        values[name]=value
+    with conn:conn.execute("INSERT OR REPLACE INTO feed_settings (id,accent,font_size,show_origin,style,color_theme,text_color,title_color,text_font,title_font) VALUES (1,?,?,?,?,'auto',?,?,?,?)",(accent,font_size,int(bool(show_origin)),style,*values.values()))
 
 
 def bulk_action(conn, keys, action, actor='admin'):

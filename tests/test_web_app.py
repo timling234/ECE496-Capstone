@@ -99,13 +99,15 @@ class EditorialWebTests(unittest.TestCase):
         self.assertEqual(publishable(self.conn)[0]['post_id'],'C')
         snapshot=self.conn.execute('SELECT * FROM posts ORDER BY platform,post_id').fetchall()
         save_presentation(self.conn,'#112233',20,False)
-        self.assertEqual(presentation(self.conn),dict(accent='#112233',font_size=20,show_origin=0,style='classic',color_theme='auto'))
+        self.assertEqual(presentation(self.conn),dict(accent='#112233',font_size=20,show_origin=0,style='classic',color_theme='auto',text_color='',title_color='',text_font='default',title_font='default'))
         self.assertEqual(snapshot,self.conn.execute('SELECT * FROM posts ORDER BY platform,post_id').fetchall())
-        for style in ('precision','slate'):
+        for style in ('precision','classic_dark','precision_dark'):
             save_presentation(self.conn,'#112233',20,False,style)
             self.assertEqual(presentation(self.conn)['style'],style)
-        save_presentation(self.conn,'#112233',20,True,'precision','dark')
-        self.assertEqual(presentation(self.conn)['color_theme'],'dark')
+        save_presentation(self.conn,'#112233',20,True,'precision_dark',text_color='#ddeeff',title_color='#ffffff',text_font='georgia',title_font='mono')
+        self.assertEqual(presentation(self.conn)['text_font'],'georgia')
+        self.assertEqual(presentation(self.conn)['title_color'],'#ffffff')
+        with self.assertRaises(ValueError):save_presentation(self.conn,'#112233',20,True,'classic',text_font='bad;css')
         with self.assertRaises(ValueError):save_presentation(self.conn,'#112233',20,True,'unknown')
         with self.assertRaises(ValueError):save_presentation(self.conn,'red;display:none',20,True)
 
