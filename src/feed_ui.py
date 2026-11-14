@@ -3,6 +3,7 @@ REF-MSRG-NEWS: layout reference only; no MSRG/Elfsight implementation copied.
 """
 
 import html
+from .feed_themes import THEMES, theme_css
 import re
 from urllib.parse import urlencode,quote
 
@@ -17,6 +18,8 @@ def appearance_overrides(query):
     except (ValueError,TypeError):pass
     origin=query.get('show_origin',[''])[0]
     if origin in ('0','1'):result['show_origin']=int(origin)
+    style=query.get('style',[''])[0]
+    if style in THEMES:result['style']=style
     return result
 
 
@@ -116,7 +119,9 @@ def feed_body(posts,settings,esc,safe_url):
         if others:body+='<p class="news-other-sources">Also reposted by '+esc(', '.join(others))+'</p>'
         cards.append(body+'</article>')
     pages=['<div class="news-page">'+''.join(cards[i:i+4])+'</div>' for i in range(0,len(cards),4)]
-    return FEED_STYLE+STREAM_STYLE+'<section class="news-carousel" aria-label="Published news"><div class="news-pages">'+(''.join(pages) or '<p>No published updates yet.</p>')+'</div><button type="button" class="news-arrow news-prev" aria-label="Previous page" hidden>'+icon('prev')+'</button><button type="button" class="news-arrow news-next" aria-label="Next page" hidden>'+icon('next')+'</button><nav class="news-dots" aria-label="News pages"></nav><span class="news-sr" data-page-status aria-live="polite"></span></section><script src="/assets/feed.js?v=post-stream-1" defer></script>'
+    style=settings.get('style','classic')
+    if style not in THEMES:style='classic'
+    return FEED_STYLE+STREAM_STYLE+theme_css(style,settings.get('accent','#215e95'))+'<section class="news-carousel news-theme-'+style+'" aria-label="Published news"><div class="news-pages">'+(''.join(pages) or '<p>No published updates yet.</p>')+'</div><button type="button" class="news-arrow news-prev" aria-label="Previous page" hidden>'+icon('prev')+'</button><button type="button" class="news-arrow news-next" aria-label="Next page" hidden>'+icon('next')+'</button><nav class="news-dots" aria-label="News pages"></nav><span class="news-sr" data-page-status aria-live="polite"></span></section><script src="/assets/feed.js?v=themes-1" defer></script>'
 
 
 def mock_body(query=None):

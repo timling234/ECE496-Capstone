@@ -352,7 +352,7 @@ def make_handler(db,password,host='127.0.0.1',port=5000,runtime=None,dev_enabled
                     with closing(self.db_connection()) as conn:
                         if route=='/edit':edit_announcement(conn,value('post_id'),value('text'),actor=self.actor())
                         elif route=='/order':set_order(conn,value('platform'),value('post_id'),value('position'))
-                        else:save_presentation(conn,value('accent'),value('font_size'),bool(value('show_origin')))
+                        else:save_presentation(conn,value('accent'),value('font_size'),bool(value('show_origin')),value('style') or None)
                 except ValueError as exc:return self.send(400,page('Invalid change',esc(exc)))
                 destination=value('return_view') or 'pending'
                 if destination not in ('approved','pending','rejected'):destination='pending'

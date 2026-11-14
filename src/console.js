@@ -181,6 +181,7 @@
     } catch (_) { toast('Could not confirm the result. Check the connection before trying again.', true); }
     finally {
       if (automatic && !saved) { const input = form.elements.namedItem(automatic); if (input?.type === 'checkbox') input.checked = input.defaultChecked; }
+      if (!saved) form.querySelectorAll('input[type=radio]').forEach(input => input.checked = input.defaultChecked);
       delete form.dataset.autoCheckbox;
       switches.forEach(input => input.disabled = false);
       buttons.forEach(button => button.disabled = false); posting = false; schedule();

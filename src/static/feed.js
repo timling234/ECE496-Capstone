@@ -87,7 +87,7 @@
   function openStream(card) {
     const source = {type:'asap-open-post-stream',postId:card.dataset.postId,platform:card.dataset.platform,account:card.dataset.accountId};
     try { if (parent !== window && parent.asapStreamHost) { parent.postMessage(source,location.origin); return; } } catch (_) {}
-    const dialog = document.createElement('dialog'); dialog.className = 'news-post-stream';
+    const dialog = document.createElement('dialog'); dialog.className = 'news-post-stream ' + [...root.classList].filter(name => name.startsWith('news-theme-')).join(' ');
     const close = document.createElement('button'); close.className = 'news-stream-close'; close.textContent = '×'; close.setAttribute('aria-label','Close post list'); close.onclick = () => dialog.close();
     const scroller = document.createElement('div'); scroller.className = 'news-stream-scroller';
     const list = document.createElement('div'); list.className = 'news-stream-list'; scroller.append(list); dialog.append(close,scroller);

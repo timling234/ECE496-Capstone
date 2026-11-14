@@ -21,6 +21,8 @@ def initialize(conn):
       id INTEGER PRIMARY KEY, platform TEXT, post_id TEXT, action TEXT NOT NULL,
       actor TEXT NOT NULL, acted_at TEXT NOT NULL);
     """)
+    if "style" not in {row[1] for row in conn.execute("PRAGMA table_info(feed_settings)")}:
+        with conn:conn.execute("ALTER TABLE feed_settings ADD COLUMN style TEXT NOT NULL DEFAULT 'classic'")
 
 
 def fingerprint(post):
@@ -164,16 +166,19 @@ def edit_announcement(conn, post_id, text, actor='admin'):
 
 # FR-9: Presentation settings cannot change eligibility or provenance.
 def presentation(conn):
-    row=conn.execute('SELECT accent,font_size,show_origin FROM feed_settings WHERE id=1').fetchone()
-    return dict(zip(('accent','font_size','show_origin'),row or ('#215e95',16,1)))
+    row=conn.execute('SELECT accent,font_size,show_origin,style FROM feed_settings WHERE id=1').fetchone()
+    return dict(zip(('accent','font_size','show_origin','style'),row or ('#215e95',16,1,'classic')))
 
 
-def save_presentation(conn, accent, font_size, show_origin):
+def save_presentation(conn, accent, font_size, show_origin, style=None):
     import re
     if not re.fullmatch(r'#[0-9a-fA-F]{6}',accent): raise ValueError('Choose a six-digit hex color')
     font_size=int(font_size)
     if not 12<=font_size<=24:raise ValueError('Font size must be 12–24')
-    with conn:conn.execute('INSERT OR REPLACE INTO feed_settings VALUES (1,?,?,?)',(accent,font_size,int(bool(show_origin))))
+    from .feed_themes import THEMES
+    style=presentation(conn)['style'] if style is None else style
+    if style not in THEMES:raise ValueError('Choose an available feed style')
+    with conn:conn.execute('INSERT OR REPLACE INTO feed_settings (id,accent,font_size,show_origin,style) VALUES (1,?,?,?,?)',(accent,font_size,int(bool(show_origin)),style))
 
 
 def bulk_action(conn, keys, action, actor='admin'):

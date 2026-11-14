@@ -99,8 +99,12 @@ class EditorialWebTests(unittest.TestCase):
         self.assertEqual(publishable(self.conn)[0]['post_id'],'C')
         snapshot=self.conn.execute('SELECT * FROM posts ORDER BY platform,post_id').fetchall()
         save_presentation(self.conn,'#112233',20,False)
-        self.assertEqual(presentation(self.conn),dict(accent='#112233',font_size=20,show_origin=0))
+        self.assertEqual(presentation(self.conn),dict(accent='#112233',font_size=20,show_origin=0,style='classic'))
         self.assertEqual(snapshot,self.conn.execute('SELECT * FROM posts ORDER BY platform,post_id').fetchall())
+        for style in ('precision','slate'):
+            save_presentation(self.conn,'#112233',20,False,style)
+            self.assertEqual(presentation(self.conn)['style'],style)
+        with self.assertRaises(ValueError):save_presentation(self.conn,'#112233',20,True,'unknown')
         with self.assertRaises(ValueError):save_presentation(self.conn,'red;display:none',20,True)
 
     def test_pin_overrides_newest_without_approving(self):
