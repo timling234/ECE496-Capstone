@@ -113,6 +113,13 @@ class ReshareTests(unittest.TestCase):
             self.assertIn('Seminar on Friday.',payload['text']);self.assertFalse(payload['media_reviewed'])
             current['metadata']['embed_review']['text']='Another test from bluesky'
             self.assertEqual(recommendation(current)['recommendation'],'reject')
+            changed=prepare(db,[current],reader=Mock(return_value=html.replace('Seminar on Friday.','Seminar on Monday.')),force=True)
+            self.assertEqual(changed,{post['post_id']})
+            with sqlite3.connect(db) as conn:
+                self.assertEqual(items(conn)[0]['editorial_status'],'needs review')
+            prepare(db,[current],reader=Mock(side_effect=ValueError('Temporary outage')),force=True)
+            with sqlite3.connect(db) as conn:
+                self.assertIn('Seminar on Monday.',items(conn)[0]['metadata']['embed_presentation']['text'])
             for invalid in (html.replace(ROOT,'urn:li:ugcPost:999'),html.split('</p>')[0]):
                 parser=RepostText({ROOT});parser.feed(invalid);parser.close()
                 with self.assertRaises(ValueError):parser.text()

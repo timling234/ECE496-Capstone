@@ -2,6 +2,7 @@
 import copy
 import sqlite3
 import unittest
+from unittest.mock import patch
 from urllib.error import HTTPError
 from src.providers import FetchBatch
 from src.polling import poll_due, PollingSource
@@ -25,18 +26,45 @@ class SourceSyncTests(unittest.TestCase):
             def request(self,url,token=None):
                 if self.state=='error':raise HTTPError(url,403,'forbidden',{},None)
                 if self.state=='gone':return {'results':{},'errors':{p['post_id']:{'status':404}}}
+                if self.state=='repost_gone' and 'viewContext=READER' in url:
+                    return {'results':{},'errors':{'urn:li:ugcPost:999':{'status':404}}}
                 payload=dict(p['raw'],commentary='Updated research seminar announcement',lastModifiedAt=2)
+                if self.state=='repost_gone':payload.update(commentary='',reshareContext={'root':'urn:li:ugcPost:999','parent':'urn:li:ugcPost:999'})
                 return {'results':{p['post_id']:payload}}
         provider=Provider();source=PollingSource(provider,1800,True)
-        result=poll_due(conn,[source],100,force=True)[0]
+        with patch('src.source_profile.refresh') as refresh_profile:
+            result=poll_due(conn,[source],100)[0]
+        self.assertTrue(refresh_profile.call_args.kwargs['force'])
         self.assertEqual(result['updated'],1);self.assertEqual(items(conn)[0]['editorial_status'],'needs review');self.assertEqual(publishable(conn),[])
         decide(conn,p['platform'],p['post_id'],'approve')
         provider.state='error';result=poll_due(conn,[source],200,force=True)[0]
         self.assertEqual(result['unchecked'],1);self.assertEqual(len(publishable(conn)),1)
         provider.state='gone';result=poll_due(conn,[source],300,force=True)[0]
-        self.assertEqual(result['unavailable'],1);self.assertTrue(items(conn)[0]['source_unavailable']);self.assertEqual(publishable(conn),[])
-        provider.state='edit';result=poll_due(conn,[source],400,force=True)[0]
-        self.assertFalse(items(conn)[0]['source_unavailable']);self.assertEqual(publishable(conn),[])
+        self.assertEqual(result['unavailable'],1);self.assertEqual(len(publishable(conn)),1)
+        task=next(q for q in items(conn) if q['metadata'].get('deletion_sync'))
+        from src.ai_automation import analyze
+        self.assertEqual(analyze(None,[task])[0]['recommendation'],'approve')
+        poll_due(conn,[source],350,force=True)
+        self.assertEqual(conn.execute('SELECT COUNT(*) FROM deletion_tasks').fetchone()[0],1)
+        decide(conn,task['platform'],task['post_id'],'reject')
+        self.assertEqual(len(publishable(conn)),1)
+        provider.state='edit';poll_due(conn,[source],400,force=True)
+        self.assertFalse(any(q['metadata'].get('deletion_sync') for q in items(conn)))
+        with self.assertRaises(ValueError):decide(conn,task['platform'],task['post_id'],'approve')
+        provider.state='repost_gone';result=poll_due(conn,[source],500,force=True)[0]
+        self.assertEqual(result['unavailable'],1);self.assertEqual(len(publishable(conn)),1)
+        task=next(q for q in items(conn) if q['metadata'].get('deletion_sync'))
+        from src.console_ui import render_console
+        from src.web_app import esc,card
+        from src.web_editorial import presentation,bulk_action
+        rendered=render_console(items(conn),[],presentation(conn),{'sources':[]},{'csrf':'fixture'},'pending',esc,card)
+        self.assertIn('Deletion sync requested',rendered)
+        bulk_action(conn,[(task['platform'],task['post_id'])],'approve',actor='ai:fixture')
+        self.assertEqual(publishable(conn),[])
+        self.assertEqual(conn.execute('SELECT COUNT(*) FROM posts').fetchone()[0],0)
+        self.assertEqual(conn.execute("SELECT COUNT(*) FROM deletion_tasks WHERE status='approved'").fetchone()[0],1)
+
+
 
     def test_bounded_bluesky_lookup_and_x_errors(self):
         from src.source_sync import lookup

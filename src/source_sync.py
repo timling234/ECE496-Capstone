@@ -68,6 +68,8 @@ def reconcile(conn,provider,batch,now):
         try:found,unavailable=lookup(provider,missing[:cap])
         except (HTTPError,ValueError,OSError,KeyError,TypeError) as exc:error=('HTTP '+str(exc.code)) if isinstance(exc,HTTPError) else type(exc).__name__
     fresh.update({p['post_id']:p for p in found})
+    # An unavailable original also requests review; retain the saved local content.
+    unavailable=list(set(unavailable)|{identity for identity,p in fresh.items() if p['platform']=='linkedin' and p['metadata'].get('is_repost') and p['metadata'].get('original_resolution')=='unavailable'})
     # Preserve valid older approvals across the stable-media fingerprint upgrade.
     if conn.execute("SELECT 1 FROM sqlite_master WHERE name='editorial_decisions'").fetchone():
         for identity,p in fresh.items():
@@ -75,6 +77,8 @@ def reconcile(conn,provider,batch,now):
             if old:
                 legacy=hashlib.sha256(json.dumps({k:old[k] for k in ('text','created_at','post_url','links','media')},sort_keys=True).encode()).hexdigest()
                 conn.execute("UPDATE editorial_decisions SET fingerprint=? WHERE platform=? AND post_id=? AND fingerprint=? AND status='approved'",(fingerprint(old),p['platform'],identity,legacy))
+    for identity in unavailable:
+        if (provider.platform,identity) in previous:fresh[identity]=previous[(provider.platform,identity)]
     changed=[i for i,p in fresh.items() if (p['platform'],i) in previous and fingerprint(p)!=fingerprint(previous[(p['platform'],i)])]
     # A rotating, bounded check reports what was not verified rather than claiming
     # full synchronization. Cooldowns, polling settings and source scopes stay intact.
@@ -87,6 +91,9 @@ def reconcile(conn,provider,batch,now):
         gone=identity in unavailable
         if gone and (not old or not old[0]):newly_unavailable.append(identity)
         conn.execute('INSERT OR REPLACE INTO source_post_checks VALUES (?,?,?,?,?)',(provider.key,provider.platform,identity,now,int(gone)))
-        if gone and conn.execute("SELECT 1 FROM sqlite_master WHERE name='editorial_decisions'").fetchone():
-            conn.execute("UPDATE editorial_decisions SET status='needs review' WHERE platform=? AND post_id=? AND status='approved'",(provider.platform,identity))
+        from .deletion_review import detected,recovered
+        if gone:
+            target=previous.get((provider.platform,identity)) or fresh.get(identity)
+            if target:detected(conn,target)
+        elif not gone:recovered(conn,provider.platform,identity)
     return list(fresh.values()),dict(updated=len(changed),unavailable=len(newly_unavailable),checked=len(checked),unchecked=len({p['post_id'] for p in owned}-checked),verification_error=error)

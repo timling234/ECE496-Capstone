@@ -1,13 +1,14 @@
 """Single-worker scheduler with explicit intervals and atomic source checkpoints."""
 
 import math
+import sqlite3
 from dataclasses import dataclass
 from email.utils import parsedate_to_datetime
 from urllib.error import HTTPError
 
 from .providers import Provider
 from .source_sync import reconcile
-from .store_poc import process_stored, store
+from .store_poc import process_stored, store, load_posts
 
 
 # FR-1: Live polling requires explicit enablement and an explicit interval
@@ -75,7 +76,15 @@ def poll_due(conn, sources, now, force=False):
             new_count=len({(p["platform"],p["post_id"]) for p in batch.posts
                 if not conn.execute("SELECT 1 FROM posts WHERE platform=? AND post_id=?",(p["platform"],p["post_id"])).fetchone()})
             from .source_profile import refresh
-            refresh(conn,provider.platform,provider.account,batch.posts,now,force=force)
+            from .embed_review import read_public,prepare
+            pages={}
+            def public_reader(url):
+                if url not in pages:
+                    try:pages[url]=read_public(url)
+                    except Exception as exc:pages[url]=exc
+                if isinstance(pages[url],Exception):raise pages[url]
+                return pages[url]
+            refresh(conn,provider.platform,provider.account,batch.posts or load_posts(conn),now,force=True,reader=public_reader)
             with conn:
                 merged,sync=reconcile(conn,provider,batch,now)
                 store(conn, merged)
@@ -84,6 +93,19 @@ def poll_due(conn, sources, now, force=False):
                     last_attempt_at=?,last_success_at=?,error_type=NULL,next_poll_at=?,fetched_count=?,new_count=?,error_code=NULL WHERE source_key=?""",
                              (batch.checkpoint, now, now, now + source.interval_seconds, len(batch.posts), new_count, provider.key))
                 conn.execute('UPDATE source_poll_state SET updated_count=?,unavailable_count=?,unchecked_count=? WHERE source_key=?',(sync['updated'],sync['unavailable'],sync['unchecked'],provider.key))
+            db_path=next((row[2] for row in conn.execute('PRAGMA database_list') if row[1]=='main'),'')
+            if db_path and provider.platform=='linkedin':
+                # Refresh public originals too; reuse the profile page if it is the same URL.
+                # Bound this fallback separately from REST ingestion and keep source success.
+                try:
+                    cached={}
+                    if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='embed_review_cache'").fetchone():cached=dict(conn.execute('SELECT post_id,checked_at FROM embed_review_cache'))
+                    review_posts=sorted([p for p in merged if p['metadata'].get('is_repost') and p['metadata'].get('original_resolution') not in ('available','unavailable')],key=lambda p:cached.get(p['post_id'],0))
+                    embed_changed=prepare(db_path,review_posts,reader=public_reader,presentation=True,force=True,limit=4)
+                    if embed_changed:
+                        sync['updated']+=len(embed_changed)
+                        with conn:conn.execute('UPDATE source_poll_state SET updated_count=? WHERE source_key=?',(sync['updated'],provider.key))
+                except (ValueError,OSError,sqlite3.Error):pass
             outcomes.append({"source": provider.key, "status": "ok", "fetched": len(batch.posts), "new": new_count,**sync})
         except Exception as error:
             retry_at = now + source.interval_seconds

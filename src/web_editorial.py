@@ -50,7 +50,7 @@ def items(conn):
         from .publishing_policy import explicit_test_post,placeholder_test_post
         p['publication_blocked']=explicit_test_post(p) or placeholder_test_post(p)
         p['original_content_unavailable']=bool(p['metadata'].get('is_repost') and p['metadata'].get('original_resolution')!='available')
-        p['source_unavailable']=(p['platform'],p['post_id']) in unavailable
+        p['source_unavailable']=(p['platform'],p['post_id']) in unavailable or bool(p['metadata'].get('is_repost') and p['metadata'].get('original_resolution')=='unavailable')
         p['pinned'],p['position']=ordering.get((p['platform'],p['post_id']),(0,0))
         key=(p['platform'],p['post_id']); d=decisions.get(key)
         p['editorial_reason']=reasons.get(key)
@@ -64,7 +64,8 @@ def items(conn):
         if not d and table_exists(conn,'group_approvals') and p['group']:
             old=conn.execute('SELECT platform,post_id FROM group_approvals WHERE group_id=?',(p['group'],)).fetchone()
             if old==key: p['editorial_status']='approved'
-    return posts
+    from .deletion_review import items as deletion_items
+    return posts+deletion_items(conn,posts,unavailable)
 
 
 def decide(conn, platform, post_id, action, actor='admin', *, transaction=True):
@@ -74,6 +75,11 @@ def decide(conn, platform, post_id, action, actor='admin', *, transaction=True):
     try:
         posts=items(conn); p=next((p for p in posts if (p['platform'],p['post_id'])==(platform,post_id)),None)
         if p is None: raise ValueError('Post not found')
+        if p['metadata'].get('deletion_sync'):
+            from .deletion_review import decide as decide_deletion
+            decide_deletion(conn,p,action,actor,datetime.now(timezone.utc).isoformat())
+            if transaction:conn.commit()
+            return
         if action=='approve' and p['original_content_unavailable'] and not embed_url(p):raise ValueError('LinkedIn did not provide the original repost content; it cannot be published as a complete news item')
         if action=='approve' and p['publication_blocked']:raise ValueError('Placeholder or explicitly test-only content cannot be published')
         if action=='approve' and p['candidate_status']!='candidate': raise ValueError('Only candidates can be approved')
@@ -105,7 +111,7 @@ def publishable(conn):
     result=[]; seen=set()
     posts=items(conn)
     for p in sorted(posts,key=lambda p:(p['pinned'],p['created_at'] or '',p['platform'],p['post_id']),reverse=True):
-        if (p['original_content_unavailable'] and not embed_url(p)) or p['publication_blocked'] or p['editorial_status']!='approved' or p['candidate_status']!='candidate': continue
+        if p['metadata'].get('deletion_sync') or (p['original_content_unavailable'] and not embed_url(p)) or p['publication_blocked'] or p['editorial_status']!='approved' or p['candidate_status']!='candidate': continue
         if p['group'] and p['group'] in seen: continue
         if p['group']: seen.add(p['group'])
         if p['group']:
@@ -190,21 +196,29 @@ def bulk_action(conn, keys, action, actor='admin'):
                 decide(conn,platform,post_id,action,actor,transaction=False)
                 if p['group']:groups.add(p['group'])
             else:
-                for table in ('editorial_decisions','editorial_reasons','feed_order','group_approvals',
-                              'ai_suggestions','source_post_checks','notification_seen','notification_outbox','relevance','duplicate_candidates'):
-                    if table_exists(conn,table):conn.execute('DELETE FROM '+table+' WHERE platform=? AND post_id=?',(platform,post_id))
-                if platform=='manual':conn.execute('DELETE FROM manual_versions WHERE post_id=?',(post_id,))
-                if table_exists(conn,'notification_events_seen'):conn.execute('DELETE FROM notification_events_seen WHERE subject=?',(platform+':'+post_id,))
-                conn.execute('DELETE FROM posts WHERE platform=? AND post_id=?',(platform,post_id))
-                # Bluesky may be configured by handle while records use DID. Reset
-                # that platform's boundaries, retaining cooldowns and polling switches.
-                if table_exists(conn,'source_poll_state'):
-                    conn.execute('UPDATE source_poll_state SET checkpoint=NULL WHERE platform=?'+(' AND account=?' if platform!='bluesky' else ''),
-                                 (platform,p['account_id']) if platform!='bluesky' else (platform,))
-                conn.execute('INSERT INTO editorial_actions(platform,post_id,action,actor,acted_at) VALUES (?,?,?,?,?)',
-                             (platform,post_id,'delete',actor,datetime.now(timezone.utc).isoformat()))
+                if p['metadata'].get('deletion_sync'):
+                    conn.execute("UPDATE deletion_tasks SET status='dismissed' WHERE id=?",(post_id,))
+                else:remove_post(conn,p,actor)
             changed+=1
         if action=='delete':process_stored(conn)
         conn.commit();return changed
     except Exception:
         conn.rollback();raise
+
+
+def remove_post(conn,p,actor):
+    platform,post_id=p['platform'],p['post_id']
+    for table in ('editorial_decisions','editorial_reasons','feed_order','group_approvals',
+                  'ai_suggestions','source_post_checks','notification_seen','notification_outbox','relevance','duplicate_candidates'):
+        if table_exists(conn,table):conn.execute('DELETE FROM '+table+' WHERE platform=? AND post_id=?',(platform,post_id))
+    if platform=='manual':conn.execute('DELETE FROM manual_versions WHERE post_id=?',(post_id,))
+    if table_exists(conn,'notification_events_seen'):conn.execute('DELETE FROM notification_events_seen WHERE subject=?',(platform+':'+post_id,))
+    if table_exists(conn,'deletion_tasks'):conn.execute("UPDATE deletion_tasks SET status='cancelled' WHERE platform=? AND target_id=? AND status IN ('pending','rejected','dismissed')",(platform,post_id))
+    conn.execute('DELETE FROM posts WHERE platform=? AND post_id=?',(platform,post_id))
+    # Bluesky may be configured by handle while records use DID. Reset
+    # that platform's boundaries, retaining cooldowns and polling switches.
+    if table_exists(conn,'source_poll_state'):
+        conn.execute('UPDATE source_poll_state SET checkpoint=NULL WHERE platform=?'+(' AND account=?' if platform!='bluesky' else ''),
+                     (platform,p['account_id']) if platform!='bluesky' else (platform,))
+    conn.execute('INSERT INTO editorial_actions(platform,post_id,action,actor,acted_at) VALUES (?,?,?,?,?)',
+                 (platform,post_id,'delete',actor,datetime.now(timezone.utc).isoformat()))

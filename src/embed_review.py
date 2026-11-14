@@ -90,13 +90,13 @@ def read_public(url):
             return raw.decode('utf-8',errors='strict')
 
 
-def prepare(db,posts,reader=read_public,*,presentation=False,limit=None):
+def prepare(db,posts,reader=read_public,*,presentation=False,limit=None,force=False):
     # Run in the AI background worker, never while holding a database transaction.
-    requests_made=0
+    requests_made=0;changed_posts=set()
     for p in posts:
         md=p.get('metadata',{});url=embed_url(p)
         if not url or (md.get('original_resolution')=='available' and not presentation):continue
-        if md.get('embed_review') and (not presentation or md.get('embed_presentation') or md['embed_review']['status']!='complete'):continue
+        if not force and md.get('embed_review') and (not presentation or md.get('embed_presentation') or md['embed_review']['status']!='complete'):continue
         if limit is not None and requests_made>=limit:break
         requests_made+=1
         status='unavailable';text='';snapshot=None
@@ -107,7 +107,19 @@ def prepare(db,posts,reader=read_public,*,presentation=False,limit=None):
         except Exception:pass  # No retry/login fallback; keep manual review on failures.
         with closing(sqlite3.connect(db,timeout=15)) as conn:
             initialize(conn)
+            old=conn.execute('SELECT source_fingerprint,status,text,presentation_json FROM embed_review_cache WHERE post_id=?',(p['post_id'],)).fetchone()
+            if status!='complete' and old and old[0]==source_fingerprint(p):
+                text=old[2];snapshot=json.loads(old[3]) if old[3] else None
+            if status=='complete' and old and old[0]==source_fingerprint(p) and old[2]:
+                prior=json.loads(old[3]) if old[3] else None
+                def media_identity(data):
+                    return [m.get('url','').split('?',1)[0] for m in (data or {}).get('media',[])]
+                changed=old[2]!=text or (prior is not None and media_identity(prior)!=media_identity(snapshot))
+                if changed:changed_posts.add(p['post_id'])
+                if changed and conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='editorial_decisions'").fetchone():
+                    conn.execute("UPDATE editorial_decisions SET status='needs review' WHERE platform=? AND post_id=? AND status='approved'",(p['platform'],p['post_id']))
             conn.execute('INSERT OR REPLACE INTO embed_review_cache (post_id,source_fingerprint,checked_at,status,text,presentation_json) VALUES (?,?,?,?,?,?)',(p['post_id'],source_fingerprint(p),time.time(),status,text,json.dumps(snapshot) if snapshot else None));conn.commit()
+    return changed_posts
 
 
 def fingerprint(post):

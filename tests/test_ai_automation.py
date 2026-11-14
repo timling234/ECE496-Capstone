@@ -33,6 +33,24 @@ class AutomationTests(unittest.TestCase):
     def finish(self):
         self.assertTrue(self.reviewer.slot.acquire(timeout=3));self.reviewer.slot.release()
 
+    def test_deletion_task_automation_preserves_until_approval(self):
+        identity=self.add();self.configure()
+        with closing(sqlite3.connect(self.db)) as conn:
+            decide(conn,'manual',identity,'approve')
+            from src.deletion_review import detected
+            from src.source_sync import initialize as init_checks
+            target=items(conn)[0];init_checks(conn)
+            conn.execute("INSERT INTO source_post_checks VALUES ('fixture','manual',?,1,1)",(identity,))
+            detected(conn,target);conn.commit()
+            self.assertEqual(len(publishable(conn)),1)
+            task=next(p for p in items(conn) if p['metadata'].get('deletion_sync'))
+        self.reviewer.run_batch(self.db,'alice','automatic',target=('manual',task['post_id']));self.finish()
+        with closing(sqlite3.connect(self.db)) as conn:
+            self.assertEqual(conn.execute('SELECT COUNT(*) FROM posts').fetchone()[0],0)
+            self.assertEqual(conn.execute('SELECT applied FROM ai_batches').fetchone()[0],1)
+            self.assertEqual(conn.execute('SELECT status FROM deletion_tasks').fetchone()[0],'approved')
+        self.model.review.assert_not_called()
+
     def test_disabling_automation_blocks_execution_and_manual_override_remains(self):
         post_id=self.add()
         self.configure(False,False)

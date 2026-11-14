@@ -18,6 +18,10 @@ def placeholder_test_post(post):
 
 def recommendation(post):
     md=post.get("metadata",{})
+    if md.get('deletion_sync'):
+        if md['deletion_sync']['valid']:
+            return dict(recommendation='approve',reason='Publishing rule: the source reported removal and the local target is unchanged. Approve deletion synchronization by default.')
+        return dict(recommendation='needs_review',reason='Deletion synchronization conflicts with changed or recovered content. Do not automatically delete it.')
     if md.get("is_repost") and md.get("original_resolution")!="available" and md.get("embed_review",{}).get("status")!="complete":
         return dict(recommendation="needs_review",reason="Original repost text is not available from the API or a verified public embed extraction. Review the preview manually; this is an availability check, not model inference.")
     if explicit_test_post(post):

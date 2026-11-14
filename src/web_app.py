@@ -35,7 +35,7 @@ def page(title,body,settings=None,console=False):
         'article,.panel{background:white;border:1px solid #d8e0e8;border-radius:12px;padding:20px;margin:16px 0}nav{display:flex;gap:16px;flex-wrap:wrap}'
         'button{padding:9px 15px;cursor:pointer;background:#215e95;color:white;border:0;border-radius:6px}input{padding:10px}form{display:inline-block;margin:6px}'
         '.content{white-space:pre-wrap;overflow-wrap:anywhere}small{color:#536579}img{max-width:100%;max-height:300px;border-radius:8px}a{color:#215e95}'
-        +(STYLE if console else '')+'body{font-size:'+str(settings['font_size'])+'px}a{color:'+settings['accent']+'}</style></head><body>'+('' if console else '<h1>'+esc(title)+'</h1>')+body+('<script src="/console.js" defer></script>' if console else '')+'</body></html>').encode()
+        +(STYLE if console else '')+'body{font-size:'+str(settings['font_size'])+'px}a{color:'+settings['accent']+'}</style></head><body>'+('' if console else '<h1>'+esc(title)+'</h1>')+body+('<script src="/console.js" defer></script><script src="/assets/post-stream.js?v=1" defer></script>' if console else '')+'</body></html>').encode()
 
 def card(p,csrf=None,show_origin=True,return_view="pending"):
     status=p.get('editorial_status','approved' if not csrf else 'pending')
@@ -44,7 +44,7 @@ def card(p,csrf=None,show_origin=True,return_view="pending"):
     if csrf:
         body+='<label class="post-select" hidden><input type="checkbox" name="post" form="post-bulk" value="'+esc(json.dumps([p['platform'],p['post_id']],separators=(',',':')))+'" aria-label="Select post"></label>'
         body+='<form class="post-delete" method="post" action="/posts-action"><input type="hidden" name="csrf" value="'+esc(csrf)+'"><input type="hidden" name="return_view" value="'+esc(return_view)+'"><input type="hidden" name="post" value="'+esc(json.dumps([p['platform'],p['post_id']],separators=(',',':')))+'"><input type="hidden" name="action" value="delete"><button title="Delete post" aria-label="Delete post">&#10006;</button></form>'
-    if p.get('source_unavailable'):body+='<p class="bad">Original post is deleted or unavailable. Hidden from the public feed.</p>'
+    if p.get('source_unavailable'):body+='<p><small>Source removal detected. Local copy is retained until its deletion sync task is approved.</small></p>'
     from .linkedin_embed import embed_frame
     frame=embed_frame(p,esc)
     if frame:
@@ -371,7 +371,7 @@ def make_handler(db,password,host='127.0.0.1',port=5000,runtime=None,dev_enabled
                 destination=value('return_view')
                 if destination not in ('approved','pending','rejected'):destination='pending'
                 from urllib.parse import urlencode
-                message=str(count)+' post(s) '+{'delete':'deleted. They can be fetched again if available in the source fetch window.','approve':'published.','reject':'rejected.'}[value('action')]
+                message=str(count)+' post(s) '+{'delete':'deleted. They can be fetched again if available in the source fetch window.','approve':'approved. Deletion sync tasks remove their local target copies.','reject':'rejected.'}[value('action')]
                 return self.redirect('/admin?'+urlencode(dict(view=destination,notice=message)))
             if route!='/action':return self.send(404,page('Not found',''))
             try:
