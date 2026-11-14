@@ -57,7 +57,8 @@ def fetch_bluesky(limit):
 
 # FR-2: Common post representation
 # REF-HORIZON-02: provider-independent content model (adapted concept; independent code)
-def normalize_x(post, media, account_id=X_USER_ID):
+def normalize_x(post, media, account_id=X_USER_ID, author=None):
+    author=author or {}
     keys = post.get("attachments", {}).get("media_keys", [])
     return {
         "platform": "x", "account_id": account_id, "post_id": (post.get("edit_history_tweet_ids") or [post["id"]])[0],
@@ -65,7 +66,7 @@ def normalize_x(post, media, account_id=X_USER_ID):
         "post_url": f"https://x.com/i/web/status/{post['id']}",
         "links": [u.get("expanded_url") or u.get("url") for u in post.get("entities", {}).get("urls", [])],
         "media": [media[k] for k in keys if k in media],
-        "metadata": {"entities": post.get("entities", {}), "attachments": post.get("attachments", {})},
+        "metadata": {"entities": post.get("entities", {}), "attachments": post.get("attachments", {}), "source_account_name":author.get("name"), "source_avatar":author.get("profile_image_url")},
         "raw": post,
     }
 

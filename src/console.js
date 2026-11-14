@@ -137,7 +137,11 @@
   document.addEventListener('input', e => { if (e.target.closest('main form')) dirty = true; });
   document.addEventListener('change', e => { if (e.target.closest('main form')) dirty = true; });
   document.addEventListener('change', event => {
-    if (event.target.matches('[data-auto-submit]')) { event.target.form.dataset.autoCheckbox = event.target.name; event.target.form.requestSubmit(); }
+    if (event.target.matches('[data-auto-submit]') || event.target.form?.matches('[data-auto-save]')) {
+      const form=event.target.form;
+      if (event.target.type==='checkbox') form.dataset.autoCheckbox=event.target.name;
+      form.requestSubmit();
+    }
   });
   document.addEventListener('submit', async event => {
     const form = event.target;
@@ -150,7 +154,7 @@
     const body = new URLSearchParams(new FormData(form));
     if (event.submitter?.name) body.set(event.submitter.name, event.submitter.value);
     const automatic = form.dataset.autoCheckbox;
-    const switches = [...document.querySelectorAll('[data-auto-submit]')].filter(input => !input.disabled);
+    const switches = [...document.querySelectorAll('[data-auto-submit],form[data-auto-save] input,form[data-auto-save] select,form[data-auto-save] textarea')].filter(input => !input.disabled);
     let saved = false;
     switches.forEach(input => input.disabled = true);
     buttons.forEach(button => button.disabled = true);

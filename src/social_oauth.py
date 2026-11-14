@@ -217,7 +217,7 @@ class SocialOAuth:
             account = str(user.get('id',''))
             if not re.fullmatch(r'[0-9]{1,30}',account):
                 raise ValueError('X account could not be verified')
-            label = str(user.get('username') or account)[:256]
+            label = str(user.get('name') or user.get('username') or account)[:256]
             credentials = XCredentials(pending['workspace'].db.parent/'x_credentials')
             payload['expires_at'] = self.clock()+int(payload['expires_in'])
             payload['authenticated_at'] = self.clock()

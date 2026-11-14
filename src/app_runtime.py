@@ -153,10 +153,15 @@ class AppRuntime:
             cursor=conn.execute('SELECT * FROM source_poll_state')
             columns=[d[0] for d in cursor.description]
             states={row[0]:dict(zip(columns,row)) for row in cursor}
+        from .source_profile import initialize as init_profiles
+        with closing(sqlite3.connect(self.db,timeout=15)) as conn:
+            init_profiles(conn)
+            profiles={(a,b):name for a,b,name in conn.execute('SELECT platform,account_id,name FROM source_profiles')}
         rows=[]
         for source in config['sources']:
             platform=source['platform'];key=platform+':'+source.get('account','')
             row=dict(source);row.update(states.get(key,{}))
+            row['label']=profiles.get((platform,source.get('authorized_account') or source.get('account'))) or profiles.get((platform,source.get('account'))) or row.get('label')
             row['authentication']=authentication(row,self.config_path.parent)
             row['status']=('Not connected' if platform=='linkedin' and not source.get('connection_id') else 'Reconnect LinkedIn' if platform=='linkedin' and (row.get('error_code')==401 or row.get('error_type')=='ReconnectRequired') else 'Fetching' if self.active==key
                 else 'Queued' if key in self.pending else 'Error' if row.get('error_type')

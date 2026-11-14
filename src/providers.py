@@ -51,8 +51,9 @@ class XProvider(Provider):
         if not token:
             raise ValueError("X token file is empty")
         params = {"max_results": self.page_size,
-                  "tweet.fields": "created_at,attachments,entities,edit_history_tweet_ids",
-                  "expansions": "attachments.media_keys",
+                  "tweet.fields": "created_at,attachments,entities,edit_history_tweet_ids,author_id",
+                  "expansions": "attachments.media_keys,author_id",
+                  "user.fields": "name,username,profile_image_url",
                   "media.fields": "type,url,preview_image_url,width,height"}
         if checkpoint:
             params["since_id"] = checkpoint
@@ -62,7 +63,8 @@ class XProvider(Provider):
             if payload.get("errors"):
                 raise ValueError("X returned partial errors")
             media = {m["media_key"]: m for m in payload.get("includes", {}).get("media", [])}
-            posts.extend(normalize_x(p, media, account_id=self.account) for p in payload.get("data", []))
+            authors={u["id"]:u for u in payload.get("includes",{}).get("users",[])}
+            posts.extend(normalize_x(p, media, account_id=self.account,author=authors.get(p.get("author_id") or self.account)) for p in payload.get("data", []))
             following = payload.get("meta", {}).get("next_token")
             # Preserve POC bootstrap behavior: first poll seeds one recent page.
             if not checkpoint or not following:

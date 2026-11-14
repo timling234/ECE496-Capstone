@@ -18,6 +18,21 @@ def parse(html):
 
 
 def refresh(conn,platform,account,posts,now,*,force=False,reader=None):
+    if platform in ('x','bluesky'):
+        initialize(conn)
+        for post in posts:
+            if post['platform']!=platform:continue
+            author=(post.get('raw',{}).get('post') or {}).get('author',{})
+            aliases={post['account_id']} if platform=='x' else {author.get('did'),author.get('handle')}
+            if account not in aliases:continue
+            name=post['metadata'].get('source_account_name') if platform=='x' else author.get('displayName')
+            avatar=post['metadata'].get('source_avatar') if platform=='x' else author.get('avatar')
+            if not name:continue
+            with conn:
+                for alias in aliases-{None,''}:
+                    conn.execute('INSERT OR REPLACE INTO source_profiles VALUES (?,?,?,?,?)',(platform,alias,name,avatar or '',now))
+            return
+        return
     if platform!='linkedin':return
     initialize(conn)
     row=conn.execute('SELECT checked_at FROM source_profiles WHERE platform=? AND account_id=?',(platform,account)).fetchone()
