@@ -105,4 +105,4 @@ def typography_controls(settings):
         if prefix=='link':color=settings['accent'];color_name='accent';marker=custom=''
         choices=''.join('<option value="'+key+'" '+('selected' if settings.get(prefix+'_font','default')==key else '')+'>'+name+'</option>' for key,name in [('default','Style default'),('system','System'),('arial','Arial'),('georgia','Georgia'),('times','Times New Roman'),('mono','Monospace')])
         body.append('<b>'+label+'</b><label>Text color<input aria-label="'+label+' text color" type="color" name="'+color_name+'" value="'+escape(color,quote=True)+'"'+custom+'>'+marker+'</label><label>Text font<select aria-label="'+label+' text font" name="'+prefix+'_font">'+choices+'</select></label><label>Font size<input aria-label="'+label+' font size" type="number" name="'+size_name+'" value="'+str(settings.get(size_name,default_size))+'" min="12" max="24"></label>')
-    return ''.join(body)+'</div><button type="button" data-reset-text-colors>Reset typography</button>'
+    return ''.join(body)+'</div><button type="button" data-reset-text-colors>Reset</button>'
