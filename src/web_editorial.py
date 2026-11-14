@@ -21,6 +21,8 @@ def initialize(conn):
       id INTEGER PRIMARY KEY, platform TEXT, post_id TEXT, action TEXT NOT NULL,
       actor TEXT NOT NULL, acted_at TEXT NOT NULL);
     """)
+    if "color_theme" not in {row[1] for row in conn.execute("PRAGMA table_info(feed_settings)")}:
+        with conn:conn.execute("ALTER TABLE feed_settings ADD COLUMN color_theme TEXT NOT NULL DEFAULT 'auto'")
     if "style" not in {row[1] for row in conn.execute("PRAGMA table_info(feed_settings)")}:
         with conn:conn.execute("ALTER TABLE feed_settings ADD COLUMN style TEXT NOT NULL DEFAULT 'classic'")
 
@@ -102,6 +104,9 @@ def decide(conn, platform, post_id, action, actor='admin', *, transaction=True):
             conn.execute('INSERT OR REPLACE INTO editorial_reasons VALUES (?,?,?)',(target['platform'],target['post_id'],event if event=='duplicate_not_selected' else action))
             conn.execute('INSERT INTO editorial_actions(platform,post_id,action,actor,acted_at) VALUES (?,?,?,?,?)',
                 (target['platform'],target['post_id'],event,actor,now))
+            if actor.startswith('ai:') and action in ('approve','reject'):
+                from .notifications import queue_event
+                queue_event(conn,'ai_published' if status=='approved' else 'ai_rejected',target['platform']+':'+target['post_id'],now,target['platform'],target['post_id'])
         if transaction:conn.commit()
     except Exception:
         if transaction:conn.rollback()
@@ -166,11 +171,11 @@ def edit_announcement(conn, post_id, text, actor='admin'):
 
 # FR-9: Presentation settings cannot change eligibility or provenance.
 def presentation(conn):
-    row=conn.execute('SELECT accent,font_size,show_origin,style FROM feed_settings WHERE id=1').fetchone()
-    return dict(zip(('accent','font_size','show_origin','style'),row or ('#215e95',16,1,'classic')))
+    row=conn.execute('SELECT accent,font_size,show_origin,style,color_theme FROM feed_settings WHERE id=1').fetchone()
+    return dict(zip(('accent','font_size','show_origin','style','color_theme'),row or ('#215e95',16,1,'classic','auto')))
 
 
-def save_presentation(conn, accent, font_size, show_origin, style=None):
+def save_presentation(conn, accent, font_size, show_origin, style=None, color_theme=None):
     import re
     if not re.fullmatch(r'#[0-9a-fA-F]{6}',accent): raise ValueError('Choose a six-digit hex color')
     font_size=int(font_size)
@@ -178,7 +183,9 @@ def save_presentation(conn, accent, font_size, show_origin, style=None):
     from .feed_themes import THEMES
     style=presentation(conn)['style'] if style is None else style
     if style not in THEMES:raise ValueError('Choose an available feed style')
-    with conn:conn.execute('INSERT OR REPLACE INTO feed_settings (id,accent,font_size,show_origin,style) VALUES (1,?,?,?,?)',(accent,font_size,int(bool(show_origin)),style))
+    color_theme=presentation(conn)['color_theme'] if color_theme is None else color_theme
+    if color_theme not in ('auto','light','dark'):raise ValueError('Choose an available color theme')
+    with conn:conn.execute('INSERT OR REPLACE INTO feed_settings (id,accent,font_size,show_origin,style,color_theme) VALUES (1,?,?,?,?,?)',(accent,font_size,int(bool(show_origin)),style,color_theme))
 
 
 def bulk_action(conn, keys, action, actor='admin'):

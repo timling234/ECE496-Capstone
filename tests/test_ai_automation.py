@@ -67,11 +67,16 @@ class AutomationTests(unittest.TestCase):
             self.assertEqual(conn.execute('SELECT actor FROM editorial_decisions').fetchone()[0],'alice')
 
     def test_duplicate_group_advice_and_atomic_execution_publish_one_only(self):
+        from src import notifications
+        from src.notification_mail import context,message
+        with closing(sqlite3.connect(self.db)) as conn:
+            notifications.save_settings(conn,True,'email','user@example.org',{'ai_published':True,'ai_rejected':True})
         one=self.add();self.add()
         self.reviewer.submit(self.db,'manual',one,'alice');self.finish()
         with closing(sqlite3.connect(self.db)) as conn:
             self.assertEqual(conn.execute("SELECT COUNT(*) FROM ai_suggestions WHERE status='complete'").fetchone()[0],2)
             self.assertEqual(publishable(conn),[])
+            self.assertEqual(notifications.summary(conn)['pending'],0)
         self.model.generate.assert_called_once()
         self.configure()
         self.reviewer.run_batch(self.db,'alice','automatic');self.finish()
@@ -85,6 +90,16 @@ class AutomationTests(unittest.TestCase):
             self.assertFalse(any(p['ai_review']['stale'] for p in reviewed))
             self.assertEqual(conn.execute('SELECT COUNT(*) FROM ai_automation_actions').fetchone()[0],2)
             self.assertEqual(conn.execute('SELECT applied FROM ai_batches ORDER BY id DESC LIMIT 1').fetchone()[0],2)
+            events=conn.execute('SELECT event,platform,post_id FROM notification_outbox').fetchall()
+            self.assertCountEqual([event for event,_,_ in events],['ai_published','ai_rejected'])
+            for event,platform,identity in events:
+                details=context(conn,event,platform,identity)
+                self.assertFalse(details['resolved']);self.assertTrue(details['reason'])
+                body=message('user@example.org',platform,identity,event,details).get_body(preferencelist=('plain',)).get_content()
+                self.assertIn('AI reason:',body)
+                self.assertIn('view='+('approved' if event=='ai_published' else 'rejected'),body)
+            decide(conn,'manual',one,'withdraw',actor='alice')
+            self.assertEqual(len(events),conn.execute('SELECT count(*) FROM notification_outbox').fetchone()[0])
 
     def test_uncertain_group_and_approve_only_setting_cannot_reject_alternatives(self):
         self.add();self.add();self.configure(approve=True,reject=False)

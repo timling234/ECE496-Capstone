@@ -9,6 +9,8 @@ import time
 EVENTS={'ai_review':('AI needs human review','The AI flagged a post for human review. Open Review Queue.'),
         'reauth':('re-authentication needed','A connected source needs re-authentication. Open Sources.'),
         'duplicates':('possible duplicate detected','A possible duplicate group needs attention. Open Review Queue.'),
+        'ai_published':('post published by AI','AI published a post to your public feed.'),
+        'ai_rejected':('post rejected by AI','AI rejected a post.'),
         'new_post':('new post queued for review','A new post has been queued for review. Passing relevance does not approve publication.')}
 
 

@@ -28,8 +28,13 @@ def context(conn,event,platform,identity):
         if table_exists(conn,'editorial_decisions') and event in ('new_post','ai_review'):
             decision=conn.execute('SELECT status FROM editorial_decisions WHERE platform=? AND post_id=?',(platform,identity)).fetchone()
             if decision and decision[0] in ('approved','rejected'):result['resolved']=True
+        if event in ('ai_published','ai_rejected'):
+            decision=conn.execute('SELECT status,actor FROM editorial_decisions WHERE platform=? AND post_id=?',(platform,identity)).fetchone()
+            expected='approved' if event=='ai_published' else 'rejected'
+            if not decision or decision[0]!=expected or not decision[1].startswith('ai:'):result['resolved']=True
         if table_exists(conn,'ai_suggestions'):
-            row=conn.execute("SELECT reason FROM ai_suggestions WHERE platform=? AND post_id=? AND status='complete' AND recommendation='needs_review' ORDER BY id DESC LIMIT 1",(platform,identity)).fetchone()
+            recommendation={'ai_published':'approve','ai_rejected':'reject'}.get(event,'needs_review')
+            row=conn.execute("SELECT reason FROM ai_suggestions WHERE platform=? AND post_id=? AND status='complete' AND recommendation=? ORDER BY id DESC LIMIT 1",(platform,identity,recommendation)).fetchone()
             if row:result['reason']=row[0][:500]
     if event=='reauth':
         result['source_key']=identity
@@ -66,7 +71,7 @@ def message(recipient,platform,identity,event='new_post',details=None):
     account=label+(' · '+name if name else '')
     base=os.environ.get('ASAP_PUBLIC_URL','https://asap.surf').rstrip('/')
     if urlparse(base).scheme not in ('http','https'):base='https://asap.surf'
-    query={'view':'sources' if event=='reauth' else 'pending'}
+    query={'view':{'reauth':'sources','ai_published':'approved','ai_rejected':'rejected'}.get(event,'pending')}
     if event=='reauth':query['reauth_source']=details.get('source_key',identity)
     else:
         for key in ('focus_platform','focus_post','focus_group'):
@@ -80,6 +85,13 @@ def message(recipient,platform,identity,event='new_post',details=None):
         title='Your review is needed — '+label
         explanation=details.get('reason') or 'AI could not make a clear decision about this post.'
         action='Review this post';instruction='Open the post, review its content and choose Approve or Reject.'
+    elif event in ('ai_published','ai_rejected'):
+        published=event=='ai_published'
+        title=('Published by AI' if published else 'Rejected by AI')+' — '+label
+        explanation=('This post is now visible in your public feed.' if published else 'This post was not published to your public feed.')
+        if details.get('reason'):explanation+='\nAI reason: '+details['reason']
+        action='View published post' if published else 'Review rejected post'
+        instruction='You can review the decision and change it in your workspace.'
     elif event=='duplicates':
         count=details.get('count',0);title=('Compare '+str(count)+' possible duplicate posts') if count else 'Possible duplicate posts need your review'
         explanation='These updates may describe the same news.';action='Compare posts';instruction='Compare the posts in Review Queue and choose which to publish.'
