@@ -29,6 +29,15 @@
     show(Math.floor(first / size));
   }
   for (const card of cards) {
+    const nativeToggle = card.querySelector('[data-native-toggle]');
+    if (nativeToggle) nativeToggle.onclick = () => {
+      const expanded = nativeToggle.getAttribute('aria-expanded') !== 'true';
+      card.classList.toggle('is-expanded', expanded);
+      nativeToggle.setAttribute('aria-expanded', String(expanded));
+      nativeToggle.textContent = expanded ? 'Hide' : 'Read more';
+      card.querySelector('iframe').tabIndex = expanded ? 0 : -1;
+      announceHeight();
+    };
     const text = card.querySelector('.content'), button = card.querySelector('[data-read-more]');
     if (!text || !button) continue;
     text.classList.add('collapsed');
