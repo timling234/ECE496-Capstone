@@ -55,7 +55,9 @@ def feed_body(posts,settings,esc,safe_url):
         md=p.get('metadata',{});raw=p.get('raw',{})
         native=(raw.get('post') or {}).get('author') or {}
         snapshot=md.get('embed_presentation') or {}
-        label=md.get('source_account_name') or md.get('source_label') or native.get('displayName') or p.get('account_id') or 'Announcement'
+        profile=md.get('source_profile')
+        source_avatar=profile.get('avatar') if profile is not None else md.get('source_avatar') or snapshot.get('source',{}).get('avatar') or native.get('avatar')
+        label=(profile or {}).get('name') or md.get('source_account_name') or md.get('source_label') or native.get('displayName') or p.get('account_id') or 'Announcement'
         is_repost=bool(md.get('is_repost'))
         attribution=(md.get('attribution') or snapshot.get('author') or {}) if is_repost else {}
         content=p.get('text','')
@@ -64,7 +66,7 @@ def feed_body(posts,settings,esc,safe_url):
         publisher_label=label
         publisher_date=md.get('reposted_at') or p['created_at'] if is_repost else p['created_at']
         original=safe_url(p['post_url'])
-        body='<article class="news-card" data-platform="'+esc(p['platform'])+'" data-post-id="'+esc(p['post_id'])+'"><div class="news-publisher">'+avatar(md.get('source_avatar') or snapshot.get('source',{}).get('avatar') or native.get('avatar'))+'<div class="news-identity"><span class="news-name" title="'+esc(publisher_label)+'">'+esc(publisher_label)+'</span><time class="news-date">'+esc(date(publisher_date))+'</time></div>'+('<span class="news-platform">'+platform_icon(p['platform'])+'</span>' if settings['show_origin'] else '')+'</div>'
+        body='<article class="news-card" data-platform="'+esc(p['platform'])+'" data-post-id="'+esc(p['post_id'])+'"><div class="news-publisher">'+avatar(source_avatar)+'<div class="news-identity"><span class="news-name" title="'+esc(publisher_label)+'">'+esc(publisher_label)+'</span><time class="news-date">'+esc(date(publisher_date))+'</time></div>'+('<span class="news-platform">'+platform_icon(p['platform'])+'</span>' if settings['show_origin'] else '')+'</div>'
         if is_repost and md.get('repost_commentary'):body+='<p class="content" style="margin-bottom:12px">'+esc(md['repost_commentary'])+'</p>'
         body+='<section class="news-post">'
         media=[]

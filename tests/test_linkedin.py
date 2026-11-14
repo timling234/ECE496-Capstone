@@ -10,6 +10,7 @@ import tempfile
 import threading
 import time
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 from urllib.error import HTTPError
 from urllib.parse import parse_qs, urlencode, urlparse
@@ -219,7 +220,8 @@ class LinkedInTests(unittest.TestCase):
         saved=runtime.read_config()['sources'][0]
         self.assertFalse(saved['enabled']);self.assertEqual(saved['interval_seconds'],1800)
         runtime.tick();self.assertEqual(len(self.calls),2)
-        result=runtime.fetch_now('linkedin:143906318')
+        with patch('src.source_profile.refresh'):
+            result=runtime.fetch_now('linkedin:143906318')
         self.assertEqual(result['status'],'ok');self.assertEqual(result['new'],1)
         self.assertEqual(len(self.calls),3)
         _,review,_=http('/admin?view=pending')

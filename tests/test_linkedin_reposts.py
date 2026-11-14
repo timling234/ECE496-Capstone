@@ -88,6 +88,24 @@ class ReshareTests(unittest.TestCase):
                 self.assertIn('1mo',rendered);self.assertNotIn('<iframe',rendered)
                 self.assertIn('data-read-more',rendered)
             prepare(db,[current],reader=reader);reader.assert_called_once()
+            from src.source_profile import refresh,attach as attach_profile
+            profile_html='<div data-test-id="main-feed-activity-embed-card__entity-lockup"><img src="https://media.licdn.com/new-logo.jpg"><a data-tracking-control-name="public_post_embed_feed-actor-name">Test Organization</a></div>'
+            profile_reader=Mock(return_value=profile_html)
+            with sqlite3.connect(db) as conn:
+                refresh(conn,'linkedin',post['account_id'],[post],10,force=True,reader=profile_reader)
+                refresh(conn,'linkedin',post['account_id'],[post],20,reader=profile_reader)
+                profile_reader.assert_called_once()
+                profile_reader.return_value=profile_html.replace('new-logo','updated-logo')
+                refresh(conn,'linkedin',post['account_id'],[post],30,force=True,reader=profile_reader)
+                current=items(conn)[0]
+                ordinary=copy.deepcopy(current);ordinary['metadata']={'is_repost':False,'source_avatar':'https://static.licdn.com/old-icon'}
+                attach_profile(conn,[ordinary])
+                for record in (current,ordinary):
+                    rendered=feed_body([record],{'show_origin':1},esc,safe_url)
+                    self.assertIn('https://media.licdn.com/updated-logo.jpg',rendered)
+                    self.assertNotIn('old-icon',rendered)
+                self.assertEqual(current['editorial_status'],'approved')
+
             model=LocalModel('http://localhost:11434','fixture')
             model.generate=Mock(return_value=dict(recommendation='approve',reason='Substantive repost.'))
             self.assertEqual(model.review(current)['recommendation'],'approve')

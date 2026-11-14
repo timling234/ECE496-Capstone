@@ -74,6 +74,8 @@ def poll_due(conn, sources, now, force=False):
                 raise ValueError("Provider returned another platform's records")
             new_count=len({(p["platform"],p["post_id"]) for p in batch.posts
                 if not conn.execute("SELECT 1 FROM posts WHERE platform=? AND post_id=?",(p["platform"],p["post_id"])).fetchone()})
+            from .source_profile import refresh
+            refresh(conn,provider.platform,provider.account,batch.posts,now,force=force)
             with conn:
                 merged,sync=reconcile(conn,provider,batch,now)
                 store(conn, merged)
