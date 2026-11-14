@@ -137,7 +137,7 @@
   document.addEventListener('input', e => { if (e.target.closest('main form')) dirty = true; });
   document.addEventListener('change', e => { if (e.target.closest('main form')) dirty = true; });
   document.addEventListener('change', event => {
-    if (event.target.matches('[data-auto-submit]')) event.target.form.requestSubmit();
+    if (event.target.matches('[data-auto-submit]')) { event.target.form.dataset.autoCheckbox = event.target.name; event.target.form.requestSubmit(); }
   });
   document.addEventListener('submit', async event => {
     const form = event.target;
@@ -149,6 +149,10 @@
     const buttons = [...form.querySelectorAll('button')];
     const body = new URLSearchParams(new FormData(form));
     if (event.submitter?.name) body.set(event.submitter.name, event.submitter.value);
+    const automatic = form.dataset.autoCheckbox;
+    const switches = [...document.querySelectorAll('[data-auto-submit]')].filter(input => !input.disabled);
+    let saved = false;
+    switches.forEach(input => input.disabled = true);
     buttons.forEach(button => button.disabled = true);
     try {
       const response = await fetch(url, {method:'POST', body, credentials:'same-origin', headers:{'X-ASAP-Console':'1'}, signal:AbortSignal.timeout(30000)});
@@ -158,13 +162,18 @@
       } else if (new URL(response.url).pathname === '/admin' && doc.querySelector('main')) {
         const note = doc.querySelector('main > .notice');
         const message = note?.textContent || 'Request accepted.'; note?.remove();
-        replace(doc); dirty = false;
+        saved = true; replace(doc); dirty = false;
         history.replaceState(null, '', clean(response.url)); toast(message);
       } else {
         toast('Your session may have expired. Sign in again to continue.', true);
       }
     } catch (_) { toast('Could not confirm the result. Check the connection before trying again.', true); }
-    finally { buttons.forEach(button => button.disabled = false); posting = false; schedule(); }
+    finally {
+      if (automatic && !saved) { const input = form.elements.namedItem(automatic); if (input?.type === 'checkbox') input.checked = input.defaultChecked; }
+      delete form.dataset.autoCheckbox;
+      switches.forEach(input => input.disabled = false);
+      buttons.forEach(button => button.disabled = false); posting = false; schedule();
+    }
   });
   notices(document); history.replaceState(null, '', clean(location.href)); schedule();
 })();
