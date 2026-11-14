@@ -51,7 +51,7 @@ def render_console(posts,history,settings,config,session,view,esc,card,runtime=N
     if view=='feed' and feed_url:
         snippet='<iframe src="'+feed_url+'" title="ASAP news" style="width:100%;height:620px;border:0"></iframe>'
         body+='<section class="panel"><h2>Public Feed</h2><h3>Embed your feed</h3><p>Copy this code into your website:</p><textarea id="feed-embed-code" readonly aria-label="Feed embed code" rows="3" style="width:100%;max-width:100%;font-family:monospace">'+esc(snippet)+'</textarea><button type="button" data-copy="feed-embed-code">Copy embed code</button></section>'
-        body+='<section class="panel"><h2>Iframe preview</h2><iframe src="'+esc(feed_url)+'" title="Your public feed preview" style="width:100%;height:620px;border:0"></iframe></section>'
+        body+='<section class="panel"><h2>Iframe preview</h2><iframe src="'+esc(feed_url)+'" title="Your public feed preview" data-public-feed-frame style="display:block;width:100%;max-width:1120px;height:620px;margin:0 auto;border:0"></iframe></section>'
     elif view=='mock' and feed_url:
         demo_url=feed_url.rsplit('/feed',1)[0]+'/embed-demo'
         snippet='<iframe src="'+feed_url+'" title="ASAP news" loading="lazy" style="display:block;width:100%;height:620px;border:0;border-radius:12px"></iframe>'

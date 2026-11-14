@@ -89,6 +89,12 @@
     try { await navigator.clipboard.writeText(field.value); toast('Embed code copied.'); }
     catch (_) { field.focus(); field.select(); toast('Code selected. Copy it using your keyboard.', true); }
   });
+  addEventListener('message', event => {
+    const frame = document.querySelector('[data-public-feed-frame]');
+    if (!frame || event.source !== frame.contentWindow || event.origin !== location.origin || event.data?.type !== 'asap-feed-height') return;
+    const height = Number(event.data.height);
+    if (Number.isFinite(height) && height > 0 && height < 50000) frame.style.height = Math.max(620, height) + 'px';
+  });
   function updateSelection() {
     const boxes = [...document.querySelectorAll('.post-select input')];
     const count = boxes.filter(box => box.checked).length;
