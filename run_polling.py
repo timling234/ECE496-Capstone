@@ -28,8 +28,8 @@ def load_sources(path):
             if not item.get("account") or not item.get("connection_id"):
                 if enabled: raise ValueError("Connect a LinkedIn Page before enabling it")
                 continue
-            if enabled and (type(item.get("interval_seconds")) not in (int, float) or item["interval_seconds"] < 1800):
-                raise ValueError("LinkedIn polling must be at least 1800 seconds")
+            if enabled and (type(item.get("interval_seconds")) not in (int, float) or item["interval_seconds"] < 180):
+                raise ValueError("LinkedIn polling must be at least 180 seconds")
             provider = LinkedInProvider(item["account"], item["connection_id"],
                 Credentials(path.parent / "linkedin_credentials"), page_size=item.get("page_size", 100), label=item.get("label"))
             sources.append(PollingSource(provider, item.get("interval_seconds"), enabled))

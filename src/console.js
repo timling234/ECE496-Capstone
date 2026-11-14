@@ -73,7 +73,35 @@
     embed.setAttribute('style', 'display:block;width:100%;height:' + height + 'px;border:0;border-radius:12px');
     code.value = embed.outerHTML;
   }
-  document.addEventListener('change', event => { if (event.target.closest('.mock-controls')) updateMock(); });
+  function updateFeed() {
+    const controls = document.querySelector('[data-feed-controls]'), list = document.querySelector('[data-feed-preview-list]');
+    if (!controls || !list) return;
+    const platforms = [...controls.querySelectorAll('input:checked')].map(input => input.value);
+    const layout = controls.querySelector('select').value;
+    const locationUrl = new URL(location.href); locationUrl.searchParams.set('feed_platforms',platforms.join(',') || 'none'); locationUrl.searchParams.set('feed_layout',layout);
+    history.replaceState(null,'',locationUrl);
+    const labels = {x:'X',bluesky:'Bluesky',linkedin:'LinkedIn'};
+    const groups = layout === 'separate' ? platforms.map(p => [labels[p],[p]]) : [['All selected platforms',platforms]];
+    list.replaceChildren();
+    if (!platforms.length) { const empty = document.createElement('p'); empty.textContent = 'No platforms selected.'; list.append(empty); return; }
+    groups.forEach(([label, selected], index) => {
+      const url = new URL(list.dataset.feedUrl); if (selected.length !== 3) url.searchParams.set('platforms',selected.join(','));
+      const section = document.createElement('section'); section.className = 'panel';
+      const heading = document.createElement('h3'); heading.textContent = label;
+      const instruction = document.createElement('p'); instruction.textContent = 'Copy this code into your website:';
+      const frame = document.createElement('iframe'); frame.src = url.href; frame.title = label + ' public feed preview'; frame.dataset.publicFeedFrame = '';
+      frame.style.cssText = 'display:block;width:100%;max-width:1120px;height:620px;margin:0 auto;border:0';
+      const embed = document.createElement('iframe'); embed.setAttribute('src',url.href); embed.title = 'ASAP news'; embed.setAttribute('style','width:100%;height:620px;border:0');
+      const code = document.createElement('textarea'); code.id = 'feed-embed-code' + (index ? '-' + index : ''); code.readOnly = true; code.rows = 3; code.setAttribute('aria-label','Feed embed code'); code.style.cssText = 'width:100%;max-width:100%;font-family:monospace'; code.value = embed.outerHTML;
+      const copy = document.createElement('button'); copy.type = 'button'; copy.dataset.copy = code.id; copy.textContent = 'Copy embed code';
+      const title = document.createElement('h4'); title.textContent = 'Iframe preview';
+      section.append(heading,instruction,code,copy,title,frame); list.append(section);
+    });
+  }
+  document.addEventListener('change', event => {
+    if (event.target.closest('[data-feed-controls]')) updateFeed();
+    else if (event.target.closest('.mock-controls')) updateMock();
+  });
   document.addEventListener('click', async event => {
     const multi = event.target.closest('[data-multi-select]');
     if (multi) {
@@ -90,7 +118,7 @@
     catch (_) { field.focus(); field.select(); toast('Code selected. Copy it using your keyboard.', true); }
   });
   addEventListener('message', event => {
-    const frame = document.querySelector('[data-public-feed-frame]');
+    const frame = [...document.querySelectorAll('[data-public-feed-frame]')].find(node => node.contentWindow === event.source);
     if (!frame || event.source !== frame.contentWindow || event.origin !== location.origin || event.data?.type !== 'asap-feed-height') return;
     const height = Number(event.data.height);
     if (Number.isFinite(height) && height > 0 && height < 50000) frame.style.height = Math.max(620, height) + 'px';

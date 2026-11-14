@@ -49,9 +49,8 @@ def render_console(posts,history,settings,config,session,view,esc,card,runtime=N
     sources=runtime.snapshot() if runtime else [dict(s,status=('Disabled' if s.get('connection_id') else 'Not connected') if s['platform']=='linkedin' else 'Disabled') for s in config['sources']]
     counts={'Pending':sum(p['editorial_status'] in ('pending','needs review') for p in posts),'Approved':sum(p['editorial_status']=='approved' for p in posts),'Rejected':sum(p['editorial_status']=='rejected' for p in posts),'Duplicate Groups':len({p['group'] for p in posts if p['group'] and p['editorial_status'] in ('pending','needs review')})}
     if view=='feed' and feed_url:
-        snippet='<iframe src="'+feed_url+'" title="ASAP news" style="width:100%;height:620px;border:0"></iframe>'
-        body+='<section class="panel"><h2>Public Feed</h2><h3>Embed your feed</h3><p>Copy this code into your website:</p><textarea id="feed-embed-code" readonly aria-label="Feed embed code" rows="3" style="width:100%;max-width:100%;font-family:monospace">'+esc(snippet)+'</textarea><button type="button" data-copy="feed-embed-code">Copy embed code</button></section>'
-        body+='<section class="panel"><h2>Iframe preview</h2><iframe src="'+esc(feed_url)+'" title="Your public feed preview" data-public-feed-frame style="display:block;width:100%;max-width:1120px;height:620px;margin:0 auto;border:0"></iframe></section>'
+        from .feed_options import controls
+        body+=controls(feed_url,query,esc)
     elif view=='mock' and feed_url:
         demo_url=feed_url.rsplit('/feed',1)[0]+'/embed-demo'
         snippet='<iframe src="'+feed_url+'" title="ASAP news" loading="lazy" style="display:block;width:100%;height:620px;border:0;border-radius:12px"></iframe>'
@@ -98,7 +97,7 @@ def render_console(posts,history,settings,config,session,view,esc,card,runtime=N
                 body+='<label>Source name <input type="text" name="name" maxlength="80" value="'+esc(source.get('name') or platform)+'" required></label>'
                 body+='<p>Connected account: <b>'+esc(source.get('label') or source.get('account') or 'Not connected')+'</b></p>'
                 if draft:body+='<p>Authenticate this source using its row action before enabling polling.</p>'
-                body+='<label>Polling interval <input type="number" name="interval_seconds" min="'+('1800' if platform=='linkedin' else '1')+'" max="31536000" value="'+str(source.get('interval_seconds') or 1800)+'"> seconds</label><label><input type="checkbox" name="enabled" '+('checked' if source.get('enabled') else '')+' '+('disabled' if draft else '')+'>Automatic polling</label>'
+                body+='<label>Polling interval <input type="number" name="interval_seconds" min="'+('180' if platform=='linkedin' else '1')+'" max="31536000" value="'+str(source.get('interval_seconds') or 1800)+'"> seconds</label><label><input type="checkbox" name="enabled" '+('checked' if source.get('enabled') else '')+' '+('disabled' if draft else '')+'>Automatic polling</label>'
                 body+='<details><summary>Advanced settings</summary><label>Posts per request <input type="number" name="page_size" min="'+('5' if platform=='x' else '1')+'" max="100" value="'+str(source.get('page_size',5))+'"></label><p><small>Maximum posts returned by one provider request. Larger values read more data. This does not control the number shown on your website. Catch-up fetching may use multiple requests.</small></p></details>'
                 body+='<a href="/admin?view=sources">Cancel</a> <button>Save Source</button></form></section>'
     elif view=='testing':

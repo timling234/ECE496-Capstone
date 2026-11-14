@@ -189,6 +189,8 @@ def make_handler(db,password,host='127.0.0.1',port=5000,runtime=None,dev_enabled
             if route=='/feed':
                 with closing(self.db_connection()) as conn:
                     posts=publishable(conn); settings=presentation(conn)
+                from .feed_options import filter_posts
+                posts=filter_posts(posts,parse_qs(parsed.query))
                 settings.update(appearance_overrides(parse_qs(parsed.query)))
                 return self.send(200,page('MSRG / ASAP Feed',feed_body(posts,settings,esc,safe_url),settings))
             session=self.session()

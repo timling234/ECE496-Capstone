@@ -30,7 +30,7 @@ def configure_source(config, fields, key=None):
         if enabled:raise ValueError('Authenticate this source before enabling retrieval')
         if account:raise ValueError('Authenticate to select this source account')
         if not (5 if platform=='x' else 1)<=page_size<=100:raise ValueError('Invalid posts per request')
-        if platform=='linkedin' and interval<1800:raise ValueError('LinkedIn polling must be at least 1800 seconds')
+        if platform=='linkedin' and interval<180:raise ValueError('LinkedIn polling must be at least 180 seconds')
         existing.update(name=name,enabled=False,interval_seconds=interval,page_size=page_size)
         return existing
     if platform=='linkedin':
@@ -38,7 +38,7 @@ def configure_source(config, fields, key=None):
             raise ValueError('Use Connect LinkedIn to add an authorized Page')
         if account != existing.get('account'):
             raise ValueError('Connect another LinkedIn Page to change the organization')
-        if interval < 1800:raise ValueError('LinkedIn polling must be at least 1800 seconds')
+        if interval < 180:raise ValueError('LinkedIn polling must be at least 180 seconds')
         if not 1 <= page_size <= 100:raise ValueError('LinkedIn page size must be 1–100')
     elif platform=='x':XProvider(account,page_size=page_size)
     else:BlueskyProvider(account,page_size=page_size)
