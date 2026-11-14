@@ -29,21 +29,12 @@
     show(Math.floor(first / size));
   }
   for (const card of cards) {
-    const nativeToggle = card.querySelector('[data-native-toggle]');
-    if (nativeToggle) nativeToggle.onclick = () => {
-      const expanded = nativeToggle.getAttribute('aria-expanded') !== 'true';
-      card.classList.toggle('is-expanded', expanded);
-      nativeToggle.setAttribute('aria-expanded', String(expanded));
-      nativeToggle.textContent = expanded ? 'Hide' : 'Read more';
-      card.querySelector('iframe').tabIndex = expanded ? 0 : -1;
-      announceHeight();
-    };
-    const text = card.querySelector('.content'), button = card.querySelector('[data-read-more]');
-    if (!text || !button) continue;
-    text.classList.add('collapsed');
+    const texts = [...card.querySelectorAll('.content')], button = card.querySelector('[data-read-more]');
+    if (!texts.length || !button) continue;
+    texts.forEach(text => text.classList.add('collapsed'));
     button.onclick = () => {
       const expanded = button.getAttribute('aria-expanded') !== 'true';
-      text.classList.toggle('collapsed', !expanded); button.setAttribute('aria-expanded',String(expanded)); button.textContent = expanded ? 'Hide' : 'Read more'; announceHeight();
+      texts.forEach(text => text.classList.toggle('collapsed', !expanded)); button.setAttribute('aria-expanded',String(expanded)); button.textContent = expanded ? 'Hide' : 'Read more'; announceHeight();
     };
     card.querySelector('[data-share]')?.addEventListener('click', async event => {
       const button = event.currentTarget, url = button.dataset.share;
@@ -51,11 +42,32 @@
       catch (_) { /* A cancelled share leaves the card unchanged. */ }
     });
   }
+  const gallery = document.createElement('dialog'); gallery.className = 'news-gallery';
+  gallery.innerHTML = '<div data-gallery-content></div><nav><button type="button" data-gallery-prev aria-label="Previous image">←</button><span data-gallery-count></span><button type="button" data-gallery-next aria-label="Next image">→</button><button type="button" data-gallery-close>Close</button></nav>';
+  document.body.append(gallery); let media = [], imageIndex = 0;
+  function showImage(index) {
+    imageIndex = (index + media.length) % media.length;
+    const item = media[imageIndex], element = document.createElement(item.type === 'video' ? 'video' : 'img');
+    element.src = item.url;
+    if (element.tagName === 'VIDEO') element.controls = true;
+    else { element.alt = item.alt || 'Post image'; element.referrerPolicy = 'no-referrer'; }
+    gallery.querySelector('[data-gallery-content]').replaceChildren(element);
+    gallery.querySelector('[data-gallery-count]').textContent = `${imageIndex + 1} / ${media.length}`;
+    gallery.querySelector('[data-gallery-prev]').hidden = gallery.querySelector('[data-gallery-next]').hidden = media.length < 2;
+  }
+  root.querySelectorAll('[data-gallery]').forEach(link => link.addEventListener('click', event => {
+    event.preventDefault(); media = JSON.parse(link.dataset.gallery); showImage(0); gallery.showModal();
+  }));
+  gallery.querySelector('[data-gallery-prev]').onclick = () => showImage(imageIndex - 1);
+  gallery.querySelector('[data-gallery-next]').onclick = () => showImage(imageIndex + 1);
+  gallery.querySelector('[data-gallery-close]').onclick = () => gallery.close();
+  gallery.addEventListener('close', () => gallery.querySelector('[data-gallery-content]').replaceChildren());
+  gallery.addEventListener('keydown', event => { if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { event.preventDefault(); showImage(imageIndex + (event.key === 'ArrowRight' ? 1 : -1)); } });
   function measure() {
     root.querySelectorAll('.news-page:not([hidden]) .news-card').forEach(card => {
-      const text = card.querySelector('.content'), button = card.querySelector('[data-read-more]');
-      if (!text || !button) return;
-      button.hidden = button.getAttribute('aria-expanded') !== 'true' && text.scrollHeight <= text.clientHeight + 1;
+      const texts = [...card.querySelectorAll('.content')], button = card.querySelector('[data-read-more]');
+      if (!texts.length || !button) return;
+      button.hidden = button.getAttribute('aria-expanded') !== 'true' && !texts.some(text => text.scrollHeight > text.clientHeight + 1);
     });
     announceHeight();
   }

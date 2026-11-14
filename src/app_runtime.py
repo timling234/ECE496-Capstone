@@ -137,6 +137,11 @@ class AppRuntime:
                     self.active=source.provider.key if source.enabled else None
                     try:outcomes.extend(poll_due(conn,[source],now))
                     finally:self.active=None
+            from .embed_review import prepare
+            from .web_editorial import items
+            with closing(sqlite3.connect(self.db,timeout=15)) as conn:
+                saved=items(conn) if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='editorial_decisions'").fetchone() else []
+            prepare(self.db,[p for p in saved if p['metadata'].get('is_repost') and p['metadata'].get('original_resolution')!='available' and p['editorial_status']!='rejected' and not p.get('source_unavailable')],presentation=True,limit=4)
             if self.auto_reviewer:self.auto_reviewer.tick(self.db)
             self.error=None
             return outcomes

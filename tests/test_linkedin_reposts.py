@@ -38,9 +38,9 @@ class ReshareTests(unittest.TestCase):
         decide(conn,'linkedin',post['post_id'],'approve')
         result=publishable(conn);self.assertEqual(len(result),1);self.assertEqual(len(result[0]['metadata']['repost_sources']),2)
         html=feed_body(result,{'show_origin':1},esc,safe_url)
-        self.assertIn('https://www.linkedin.com/embed/feed/update/'+post['post_id'],html)
-        self.assertIn('class="linkedin-repost-frame"',html)
-        self.assertNotIn('photo.jpg',html)
+        self.assertIn('Test Organization',html);self.assertIn('Research Author',html)
+        self.assertIn('photo.jpg',html);self.assertNotIn('<iframe',html)
+        self.assertIn('data-read-more',html)
 
     def test_permission_denied_allows_manual_native_embed_but_not_ai_approval(self):
         provider=self.provider(False);post=hydrate(provider,[copy.deepcopy(RESHARE)],'only-A-token')[0]
@@ -58,7 +58,8 @@ class ReshareTests(unittest.TestCase):
         self.assertFalse(embed_url(dict(post,post_id='urn:li:ugcPost:55?injected=1')))
         self.assertFalse(embed_url(dict(post,platform='x')))
         html=feed_body(publishable(conn),{'show_origin':1},esc,safe_url)
-        self.assertIn(embed_url(post),html)
+        self.assertNotIn('<iframe',html)
+        self.assertIn('Original content is unavailable',html)
         self.assertNotIn('Research Author',html)
 
     def test_public_embed_text_cache_and_model_input_preserve_editorial_state(self):
@@ -67,7 +68,7 @@ class ReshareTests(unittest.TestCase):
         from src.embed_review import prepare,RepostText,review_text
         from src.review_ai import LocalModel
         from src.publishing_policy import recommendation
-        html='<article data-test-id="feed-reshare-content" data-attributed-urn="'+ROOT+'"><p data-test-id="feed-reshare-content__commentary">A polished research update.<br>Seminar on Friday.</p></article>'
+        html='<article data-test-id="feed-reshare-content" data-attributed-urn="'+ROOT+'"><div data-test-id="feed-reshare-content__entity-lockup"><a data-tracking-control-name="public_post_embed_reshare_feed-actor-name">Research Author</a><time>1mo</time></div><img src="https://media.licdn.com/fixture.jpg"><p data-test-id="feed-reshare-content__commentary">A polished research update.<br>Seminar on Friday.</p></article>'
         post=hydrate(self.provider(False),[copy.deepcopy(RESHARE)],'token')[0]
         with tempfile.TemporaryDirectory() as directory:
             db=Path(directory)/'test.sqlite3'
@@ -82,6 +83,10 @@ class ReshareTests(unittest.TestCase):
                 self.assertEqual(current['text'],'')  # API provenance stays untouched.
                 self.assertIn('Seminar on Friday.',review_text(current))
                 self.assertIsNone(recommendation(current))
+                rendered=feed_body([current],{'show_origin':1},esc,safe_url)
+                self.assertIn('Research Author',rendered);self.assertIn('fixture.jpg',rendered)
+                self.assertIn('1mo',rendered);self.assertNotIn('<iframe',rendered)
+                self.assertIn('data-read-more',rendered)
             prepare(db,[current],reader=reader);reader.assert_called_once()
             model=LocalModel('http://localhost:11434','fixture')
             model.generate=Mock(return_value=dict(recommendation='approve',reason='Substantive repost.'))

@@ -47,7 +47,8 @@ class RepostText(HTMLParser):
 
 
 def initialize(conn):
-    conn.execute('CREATE TABLE IF NOT EXISTS embed_review_cache (post_id TEXT PRIMARY KEY, source_fingerprint TEXT NOT NULL, checked_at REAL NOT NULL, status TEXT NOT NULL, text TEXT NOT NULL)')
+    conn.execute('CREATE TABLE IF NOT EXISTS embed_review_cache (post_id TEXT PRIMARY KEY, source_fingerprint TEXT NOT NULL, checked_at REAL NOT NULL, status TEXT NOT NULL, text TEXT NOT NULL, presentation_json TEXT)')
+    if 'presentation_json' not in {r[1] for r in conn.execute('PRAGMA table_info(embed_review_cache)')}:conn.execute('ALTER TABLE embed_review_cache ADD COLUMN presentation_json TEXT')
 
 
 def source_fingerprint(post):
@@ -57,9 +58,12 @@ def source_fingerprint(post):
 
 def attach(conn,posts):
     if not conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='embed_review_cache'").fetchone():return
-    cache={row[0]:row[1:] for row in conn.execute('SELECT post_id,source_fingerprint,checked_at,status,text FROM embed_review_cache')}
+    has_presentation='presentation_json' in {r[1] for r in conn.execute('PRAGMA table_info(embed_review_cache)')}
+    cache={row[0]:row[1:] for row in conn.execute('SELECT post_id,source_fingerprint,checked_at,status,text'+(',presentation_json' if has_presentation else ',NULL')+' FROM embed_review_cache')}
     for p in posts:
         row=cache.get(p['post_id']) if embed_url(p) else None
+        if row and row[0]==source_fingerprint(p) and row[4]:
+            p['metadata']['embed_presentation']=json.loads(row[4])
         if row and row[0]==source_fingerprint(p) and row[1]>time.time()-(21600 if row[2]=='complete' else 1800):
             p['metadata']['embed_review']=dict(status=row[2],text=row[3],source='public_linkedin_embed',checked_at=row[1])
 
@@ -86,19 +90,24 @@ def read_public(url):
             return raw.decode('utf-8',errors='strict')
 
 
-def prepare(db,posts,reader=read_public):
+def prepare(db,posts,reader=read_public,*,presentation=False,limit=None):
     # Run in the AI background worker, never while holding a database transaction.
+    requests_made=0
     for p in posts:
         md=p.get('metadata',{});url=embed_url(p)
-        if not url or md.get('original_resolution')=='available' or md.get('embed_review'):continue
-        status='unavailable';text=''
+        if not url or (md.get('original_resolution')=='available' and not presentation):continue
+        if md.get('embed_review') and (not presentation or md.get('embed_presentation') or md['embed_review']['status']!='complete'):continue
+        if limit is not None and requests_made>=limit:break
+        requests_made+=1
+        status='unavailable';text='';snapshot=None
         try:
-            parser=RepostText({v for v in (md.get('original_post_id'),md.get('parent_post_id')) if v})
-            parser.feed(reader(url));parser.close();text=parser.text();status='complete'
+            from .embed_presentation import RepostPresentation
+            parser=RepostPresentation({v for v in (md.get('original_post_id'),md.get('parent_post_id')) if v})
+            parser.feed(reader(url));parser.close();snapshot=parser.snapshot();text=snapshot['text'];status='complete'
         except Exception:pass  # No retry/login fallback; keep manual review on failures.
         with closing(sqlite3.connect(db,timeout=15)) as conn:
             initialize(conn)
-            conn.execute('INSERT OR REPLACE INTO embed_review_cache VALUES (?,?,?,?,?)',(p['post_id'],source_fingerprint(p),time.time(),status,text));conn.commit()
+            conn.execute('INSERT OR REPLACE INTO embed_review_cache (post_id,source_fingerprint,checked_at,status,text,presentation_json) VALUES (?,?,?,?,?,?)',(p['post_id'],source_fingerprint(p),time.time(),status,text,json.dumps(snapshot) if snapshot else None));conn.commit()
 
 
 def fingerprint(post):
